@@ -1,0 +1,13 @@
+/bin
+/logs
+/packages
+inc/ntverp.h
+x64/
+.vs/
+*.user
+.vscode/
+*.aps
+ComPort/installDriver.ps1
+ComPort/removeDriver.ps1
+sympath.json
+signing.json
