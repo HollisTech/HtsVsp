@@ -1,0 +1,46 @@
+name: WDK-Build
+
+on: [push,workflow_dispatch]
+
+env:
+
+  SOLUTION_FILE_PATH: .
+  BUILD_CONFIGURATION: Release
+  EWDKRoot: D:\\
+  TOOLSET: VS2022
+  ARCHIVE_PREFIX: build
+  ARCHIVE_BIN: ${{ true }}
+
+jobs:
+  build:
+    runs-on: [windows-latest]
+
+    steps:
+    - uses: actions/checkout@v4
+      with: 
+        submodules: 'true'
+
+    - name: Set Outputs
+      id: vars
+      run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+
+    - name: Build
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: >
+        .\BuildTools\build.ps1 -toolset ${{env.TOOLSET}} 
+        -configurations ${{env.BUILD_CONFIGURATION}}
+        -buildNumber ${{ github.run_number }} 
+
+    - name: Archive logs
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{env.ARCHIVE_PREFIX}}-logs
+        path: logs/**/*.log
+
+    - name: Archive Bin
+      if: ${{ env.ARCHIVE_BIN }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{env.ARCHIVE_PREFIX}}-bin
+        path: bin/**/*.*
