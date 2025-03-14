@@ -38,6 +38,7 @@ void setWaitUnits(ULONG units);
 Logger::Level Logger::currentLevel = Logger::INFO_LVL;
 std::mutex Logger::logMutex;
 Logger logger;
+ULONG htsvspPortNumber = 0;
 
 int main(int argc, CHAR* argv[])
 {
@@ -51,6 +52,7 @@ int main(int argc, CHAR* argv[])
 			("addDevice", "add a new htsvsp device")
 			("listDevices", "list all htsvsp device com ports")
 			("removeDevice", "remove htsvsp device specified by com port", cxxopts::value<std::string>())
+			("s,selectPort", "select which htsvsp port to use. Default is first found.", cxxopts::value<ULONG>())
 			("c,client", "client mode.")
 			("i,ipaddress", "ip address or dns name.", cxxopts::value<std::string>())
 			("p,port", "service port, must be greater than zero.", cxxopts::value<USHORT>())
@@ -61,7 +63,7 @@ int main(int argc, CHAR* argv[])
 			("e,echoservice", "start an echo service using port.", cxxopts::value<USHORT>())
 			("w,waitUnits", "set the 500ms wait units to n.", cxxopts::value<ULONG>())
 			("install", "install driver, requires path to the inf file.", cxxopts::value<std::string>())
-			("u,uninstall", "uninstall driver, requires path to the inf file.", cxxopts::value<std::string>())
+			("uninstall", "uninstall driver, requires path to the inf file.", cxxopts::value<std::string>())
 			("v,verbose", "verbose output.");
 
 		DeviceManager::PortDeviceManager portDevice("UMDF\\HtsVsp");
@@ -110,6 +112,11 @@ int main(int argc, CHAR* argv[])
 			deleteComPort(optResult["deleteport"].as<ULONG>());
 			return 0;
 		}
+
+		if (optResult.count("selectPort")) {
+			htsvspPortNumber = optResult["selectPort"].as<ULONG>();
+		}
+		// these three functions depend on selectPort to work correctly.
 		if (optResult.count("trace")) {
 			setTraceLevel(optResult["trace"].as<ULONG>());
 			return 0;
@@ -122,6 +129,7 @@ int main(int argc, CHAR* argv[])
 			setWaitUnits(optResult["waitUnits"].as<ULONG>());
 			return 0;
 		}
+
 		if (optResult.count("echoservice")) {
 			config.port = optResult["echoservice"].as<USHORT>();
 			echoServiceMode = true;
@@ -138,11 +146,9 @@ int main(int argc, CHAR* argv[])
 			return echoService(config);
 		}
 
-
-		ULONG portNumber;
-		ULONG result = findHtsVsp(portNumber);
+		ULONG result = findHtsVsp(htsvspPortNumber);
 		if (result == ERROR_SUCCESS) {
-			logger << "found htsvsp at \\\\.\\COM" << portNumber << "\n";
+			logger << "found htsvsp at \\\\.\\COM" << htsvspPortNumber << "\n";
 		}
 		else {
 			logger << "no htsvsp ports found\n";
@@ -150,12 +156,13 @@ int main(int argc, CHAR* argv[])
 		}
 		logger.flush(Logger::INFO_LVL);
 
-		HANDLE handle = configVSp(portNumber, config);
+		result = ERROR_SUCCESS;
+		HANDLE handle = configVSp(htsvspPortNumber, config);
 		if (handle == INVALID_HANDLE_VALUE) {
 			result = ERROR_FILE_NOT_FOUND;
 		}
 		else {
-			logger << "htsvsp at \\\\.\\COM" << portNumber << " configured\n";
+			logger << "htsvsp at \\\\.\\COM" << htsvspPortNumber << " configured\n";
 			CloseHandle(handle);
 		}
 		logger.flush(Logger::INFO_LVL);
@@ -302,9 +309,33 @@ void setWaitUnits(ULONG units)
 
 }
 
+bool testHtsVspPort(ULONG portNumber)
+{
+#pragma warning(push)
+#pragma warning(disable:6385)
+	HANDLE h = OpenCommPort(portNumber, GENERIC_READ | GENERIC_WRITE, FILE_FLAG_OVERLAPPED);
+	if (h == INVALID_HANDLE_VALUE) {
+		cout << "OpenCommPort failed error " << GetLastError() << "\n";
+		return false;
+	}
+	ULONG bytesReturned;
+	bool bResult = DeviceIoControl(h, IOCTL_HTSVSP_IDENTIFY,
+		NULL, 0, NULL, 0, &bytesReturned, NULL);
+	CloseHandle(h);
+	return bResult;
+#pragma warning(pop)
+}
+
 ULONG findHtsVsp(ULONG& portNumber)
 {
-	/// TBD: use the device interface instead?
+	// htsvspPortNumber overrides the search if it is not zero
+	if (htsvspPortNumber != 0) {
+		if (testHtsVspPort(htsvspPortNumber)) {
+			portNumber = htsvspPortNumber;
+			return ERROR_SUCCESS;
+		}
+		return ERROR_FILE_NOT_FOUND;
+	}
 	ULONG* portNumbers = NULL;
 	ULONG portNumbersCount = 0;
 	ULONG portNumbersFound = 0;
@@ -332,21 +363,11 @@ ULONG findHtsVsp(ULONG& portNumber)
 	}
 	result = ERROR_FILE_NOT_FOUND;
 	for (ULONG i = 0; i < portNumbersFound; i++) {
-#pragma warning(push)
-#pragma warning(disable:6385)
-		HANDLE h = OpenCommPort(portNumbers[i], GENERIC_READ | GENERIC_WRITE, FILE_FLAG_OVERLAPPED);
-		if (h != INVALID_HANDLE_VALUE) {
-			ULONG bytesReturned;
-			bool bResult = DeviceIoControl(h, IOCTL_HTSVSP_IDENTIFY,
-				NULL, 0, NULL, 0, &bytesReturned, NULL);
-			CloseHandle(h);
-			if (bResult) {
-				portNumber = portNumbers[i];
-				result = ERROR_SUCCESS;
-				break;
-			}
+		if (testHtsVspPort(portNumbers[i])) {
+			portNumber = portNumbers[i];
+			result = ERROR_SUCCESS;
+			break;
 		}
-#pragma warning(pop)
 	}
 	delete[] portNumbers;
 	return result;
