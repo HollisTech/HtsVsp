@@ -30,10 +30,11 @@
 
 struct HTS_VSP_CONFIG
 {
-	bool clientMode;     // if true sets to client mode else service mode.
-	USHORT port;         // service port number
-	CHAR   address[256]; // client: server address (domain name or ip address.)
-	                     // service: 0 (INADDR_ANY) for all addresses or a specific network.
+	bool closeConnections; // if true close all connections and stop the service.
+	bool clientMode;	   // if true sets to client mode else service mode.
+	USHORT port;           // service port number
+	CHAR   address[256];   // client: server address (domain name or ip address.)
+	                       // service: 0 (INADDR_ANY) for all addresses or a specific network.
 };
 typedef HTS_VSP_CONFIG* PHTS_VSP_CONFIG;
 

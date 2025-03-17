@@ -56,9 +56,11 @@ UINT32 WinSockCreate(SOCKET * pSocket)
     return status;
 }
 
-void CloseNetwork(
-    PDEVICE_CONTEXT deviceContext)
+void CleanupNetwork(PDEVICE_CONTEXT deviceContext)
 {
+    WdfTimerStop(deviceContext->IntervalTimer, FALSE);
+    WdfTimerStop(deviceContext->TotalTimer, FALSE);
+
     if (deviceContext->ThreadHandle != NULL) {
         DWORD result = WAIT_FAILED;
         deviceContext->TerminateThread = true;
@@ -72,6 +74,28 @@ void CloseNetwork(
         CloseHandle(deviceContext->ThreadHandle);
         deviceContext->ThreadHandle = NULL;
     }
+
+    if (deviceContext->ServiceSocket != INVALID_SOCKET) {
+        closesocket(deviceContext->ServiceSocket);
+        deviceContext->ServiceSocket = INVALID_SOCKET;
+    }
+    if (deviceContext->ClientSocket != INVALID_SOCKET) {
+        closesocket(deviceContext->ClientSocket);
+        deviceContext->ClientSocket = INVALID_SOCKET;
+    }
+
+    if (deviceContext->ClientThreadHandle != NULL) {
+        TerminateThread(deviceContext->ClientThreadHandle, 1);
+        CloseHandle(deviceContext->ClientThreadHandle);
+        deviceContext->ClientThreadHandle = NULL;
+    }
+}
+
+void CloseNetwork(
+    PDEVICE_CONTEXT deviceContext)
+{
+	CleanupNetwork(deviceContext);
+
     if (deviceContext->ThreadEvent != NULL) {
         CloseHandle(deviceContext->ThreadEvent);
         deviceContext->ThreadEvent = NULL;
@@ -81,7 +105,7 @@ void CloseNetwork(
         deviceContext->ServiceSocket = INVALID_SOCKET;
     }
     if (deviceContext->ServiceSocketEvent != WSA_INVALID_EVENT) {
-        WSACloseEvent(deviceContext->ClientSocketEvent);
+        WSACloseEvent(deviceContext->ServiceSocketEvent);
         deviceContext->ServiceSocketEvent = WSA_INVALID_EVENT;
     }
     if (deviceContext->ClientSocket != INVALID_SOCKET) {
@@ -510,6 +534,82 @@ DWORD ClientThread(PVOID context)
         }
     }
     return 0;
+}DWORD ServiceThread(PVOID context)
+{
+    PQUEUE_CONTEXT queueContext = (PQUEUE_CONTEXT)context;
+    PDEVICE_CONTEXT deviceContext = queueContext->DeviceContext;
+    int result;
+
+    HANDLE eventArray[3] = {
+        deviceContext->ServiceSocketEvent, // service socket accept event 
+        deviceContext->ThreadEvent,        //  terminate
+        NULL
+    };
+    //
+    // loop until terminated.
+    //
+    while (!deviceContext->TerminateThread)
+    {
+        WSANETWORKEVENTS networkEvents;
+        DWORD nEvents = eventArray[2] ? 3 : 2;
+
+        DWORD eventIndex = WSAWaitForMultipleEvents(nEvents, eventArray,
+            false, INFINITE, true);
+
+        switch (eventIndex) {
+        case WAIT_OBJECT_0:     // socket event
+        {
+            // only accept one connection at a time.
+            if (deviceContext->ClientSocket == INVALID_SOCKET) {
+                // reset the event only if we are going to do an accept.
+                WSAEnumNetworkEvents(deviceContext->ServiceSocket,
+                    deviceContext->ServiceSocketEvent, &networkEvents);
+
+                deviceContext->ClientSocket = accept(deviceContext->ServiceSocket, NULL, 0);
+                if (deviceContext->ClientSocket == INVALID_SOCKET) {
+                    Trace(TRACE_LEVEL_ERROR, "accept failure %#x",
+                        WSAGetLastError());
+                    break;
+                }
+
+                result = WSAEventSelect(deviceContext->ClientSocket,
+                    deviceContext->ClientSocketEvent,
+                    FD_READ);
+                if (result == SOCKET_ERROR) {
+                    Trace(TRACE_LEVEL_ERROR, "WSAEventSelect error % #x",
+                        WSAGetLastError());
+                    closesocket(deviceContext->ClientSocket);
+                    deviceContext->ClientSocket = INVALID_SOCKET;
+                    break;
+                }
+                deviceContext->ClientThreadHandle = CreateThread(NULL, 0, ClientThread, queueContext, 0, NULL);
+                if (deviceContext->ClientThreadHandle == NULL) {
+                    result = GetLastError();
+                    Trace(TRACE_LEVEL_ERROR, "CreateThread error: %#x",
+                        result);
+                    WSAEventSelect(deviceContext->ClientSocket,
+                        deviceContext->ClientSocketEvent,
+                        0);
+                    closesocket(deviceContext->ClientSocket);
+                    deviceContext->ClientSocket = INVALID_SOCKET;
+                    break;
+                }
+                eventArray[2] = deviceContext->ClientThreadHandle;
+            }
+            break;
+        }
+        case WAIT_OBJECT_0 + 1:  //  terminate
+            return 0;
+
+        case WAIT_OBJECT_0 + 2: // client recv data available
+            break;
+        case WSA_WAIT_IO_COMPLETION: // io completion interrupted the wait. retry.
+            break;
+        default:
+            break;
+        }
+    }
+    return 0;
 }
 
 void stopThread(PDEVICE_CONTEXT deviceContext)
@@ -528,18 +628,13 @@ void cleanupSocket(PDEVICE_CONTEXT deviceContext)
     deviceContext->ClientSocket = INVALID_SOCKET;
 }
 
+
 UINT32
 ConfigureClient(PHTS_VSP_CONFIG vspConfig, PQUEUE_CONTEXT queueContext)
 {
     PDEVICE_CONTEXT deviceContext = queueContext->DeviceContext;
 
-    if (deviceContext->ThreadHandle) {
-        stopThread(deviceContext);
-    }
-
-    if (deviceContext->ClientSocket != INVALID_SOCKET) {
-        cleanupSocket(deviceContext);
-    }
+    CleanupNetwork(deviceContext);
 
     struct addrinfo hints = { };
     hints.ai_flags = 0;
@@ -625,91 +720,14 @@ cleanup:
     return result == NO_ERROR ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
 }
 
-DWORD ServiceThread(PVOID context)
-{
-    PQUEUE_CONTEXT queueContext = (PQUEUE_CONTEXT)context;
-    PDEVICE_CONTEXT deviceContext = queueContext->DeviceContext;
-    int result;
 
-    HANDLE eventArray[3] = {
-        deviceContext->ServiceSocketEvent, // service socket accept event 
-        deviceContext->ThreadEvent,        //  terminate
-        NULL
-    };
-    //
-    // loop until terminated.
-    //
-    while (!deviceContext->TerminateThread)
-    {
-        WSANETWORKEVENTS networkEvents;
-        DWORD nEvents = eventArray[2] ? 3:2;
-
-        DWORD eventIndex = WSAWaitForMultipleEvents(nEvents, eventArray,
-            false, INFINITE, true);
-
-        switch (eventIndex) {
-        case WAIT_OBJECT_0:     // socket event
-        {
-            // only accept one connection at a time.
-            if (deviceContext->ClientSocket == INVALID_SOCKET) {
-                // reset the event only if we are going to do an accept.
-                WSAEnumNetworkEvents(deviceContext->ServiceSocket,
-                    deviceContext->ServiceSocketEvent, &networkEvents);
-
-                deviceContext->ClientSocket = accept(deviceContext->ServiceSocket, NULL, 0);
-                if (deviceContext->ClientSocket == INVALID_SOCKET) {
-                    Trace(TRACE_LEVEL_ERROR, "accept failure %#x",
-                        WSAGetLastError());
-                    break;
-                }
-
-                result = WSAEventSelect(deviceContext->ClientSocket,
-                    deviceContext->ClientSocketEvent,
-                    FD_READ);
-                if (result == SOCKET_ERROR) {
-                    Trace(TRACE_LEVEL_ERROR, "WSAEventSelect error % #x",
-                        WSAGetLastError());
-                    closesocket(deviceContext->ClientSocket);
-                    deviceContext->ClientSocket = INVALID_SOCKET;
-                    break;
-                }
-                deviceContext->ClientThreadHandle = CreateThread(NULL, 0, ClientThread, queueContext, 0, NULL);
-                if (deviceContext->ClientThreadHandle == NULL) {
-                    result = GetLastError();
-                    Trace(TRACE_LEVEL_ERROR, "CreateThread error: %#x",
-                        result);
-                    WSAEventSelect(deviceContext->ClientSocket,
-                        deviceContext->ClientSocketEvent,
-                        0);
-                    closesocket(deviceContext->ClientSocket);
-                    deviceContext->ClientSocket = INVALID_SOCKET;
-                    break;
-                }
-                eventArray[2] = deviceContext->ClientThreadHandle;
-            }
-            break;
-        }
-        case WAIT_OBJECT_0 + 1:  //  terminate
-            return 0;
-
-        case WAIT_OBJECT_0 + 2: // client recv data available
-            break; 
-        case WSA_WAIT_IO_COMPLETION: // io completion interrupted the wait. retry.
-             break;
-        default:
-            break;
-        }
-    }
-    return 0;
-}
 
 UINT32
 ConfigureService(PHTS_VSP_CONFIG vspConfig, PQUEUE_CONTEXT queueContext)
 {
     PDEVICE_CONTEXT deviceContext = queueContext->DeviceContext;
 
-    closesocket(deviceContext->ClientSocket);
-    deviceContext->ClientSocket = INVALID_SOCKET;
+    CleanupNetwork(deviceContext);
 
     sockaddr_in service;
     service.sin_family = AF_INET;

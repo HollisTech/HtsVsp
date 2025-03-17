@@ -46,25 +46,27 @@ int main(int argc, CHAR* argv[])
 		HTS_VSP_CONFIG config = { 0 };
 		bool echoServiceMode = false;
 
-		cxxopts::Options options(argv[0], "test utility for htsvsp");
+		cxxopts::Options options(argv[0], "control utility for htsvsp");
 		options.add_options()
 			("h,help", "print usage")
-			("addDevice", "add a new htsvsp device")
-			("listDevices", "list all htsvsp device com ports")
-			("removeDevice", "remove htsvsp device specified by com port", cxxopts::value<std::string>())
-			("s,selectPort", "select which htsvsp port to use. Default is first found.", cxxopts::value<ULONG>())
-			("c,client", "client mode.")
-			("i,ipaddress", "ip address or dns name.", cxxopts::value<std::string>())
+			("c,client", "client mode. requires port and ipddress")
+			("s,server", "server mode. requires port and ipaddress")
 			("p,port", "service port, must be greater than zero.", cxxopts::value<USHORT>())
+			("i,ipaddress", "ip address or dns name.", cxxopts::value<std::string>())
 			("l,listports", "list all active comport database ports.")
 			("d,deleteport", "delete comport number.", cxxopts::value<ULONG>())
 			("t,trace", "trace log level (0-3).", cxxopts::value<ULONG>())
 			("r,report", "report statistics.")
-			("e,echoservice", "start an echo service using port.", cxxopts::value<USHORT>())
+			("v,verbose", "verbose output.")
 			("w,waitUnits", "set the 500ms wait units to n.", cxxopts::value<ULONG>())
+			("addDevice", "add a new htsvsp device")
+			("removeDevice", "remove htsvsp device specified by com port", cxxopts::value<std::string>())
+			("listDevices", "list all htsvsp device com ports")
+			("stop", "stop network operations.")
+			("selectPort", "select which htsvsp port to use. Default is first found.", cxxopts::value<ULONG>())
+			("echoservice", "run as an echo service on the specified port.", cxxopts::value<USHORT>())
 			("install", "install driver, requires path to the inf file.", cxxopts::value<std::string>())
-			("uninstall", "uninstall driver, requires path to the inf file.", cxxopts::value<std::string>())
-			("v,verbose", "verbose output.");
+			("uninstall", "uninstall driver, requires path to the inf file.", cxxopts::value<std::string>());
 
 		DeviceManager::PortDeviceManager portDevice("UMDF\\HtsVsp");
 
@@ -76,13 +78,16 @@ int main(int argc, CHAR* argv[])
 			std::cout << options.help() << std::endl;
 			return 0;
 		}
+		if (optResult.count("stop")) {
+			config.closeConnections = true;
+		}
 		if (optResult.count("install")) {
 			std::string infFile = optResult["install"].as<std::string>();
 			return portDevice.installDriver(infFile, true);
 		}
 		if (optResult.count("uninstall")) {
 			std::string infFile = optResult["uninstall"].as<std::string>();
-			return portDevice.uninstallDriver();
+			return portDevice.uninstallDriver(infFile);
 		}
 		if (optResult.count("addDevice")) {
 			return portDevice.addDevice();
@@ -116,6 +121,18 @@ int main(int argc, CHAR* argv[])
 		if (optResult.count("selectPort")) {
 			htsvspPortNumber = optResult["selectPort"].as<ULONG>();
 		}
+
+		ULONG result = findHtsVsp(htsvspPortNumber);
+		if (result == ERROR_SUCCESS) {
+			logger << "found htsvsp at \\\\.\\COM" << htsvspPortNumber << "\n";
+			logger.flush(Logger::INFO_LVL);
+		}
+		else {
+			logger << "no htsvsp ports found\n";
+			logger.flush(Logger::ERROR_LVL);
+			return result;
+		}
+
 		// these three functions depend on selectPort to work correctly.
 		if (optResult.count("trace")) {
 			setTraceLevel(optResult["trace"].as<ULONG>());
@@ -134,6 +151,18 @@ int main(int argc, CHAR* argv[])
 			config.port = optResult["echoservice"].as<USHORT>();
 			echoServiceMode = true;
 		}
+		if (config.closeConnections) {
+			HANDLE handle = configVSp(htsvspPortNumber, config);
+			if (handle == INVALID_HANDLE_VALUE) {
+				logger << "failed to close connections\n";
+				logger.flush(Logger::ERROR_LVL);
+				return 1;
+			}
+			logger << "connections closed\n";
+			logger.flush(Logger::INFO_LVL);
+			CloseHandle(handle);
+			return 0;
+		}
 		if (config.port == 0) {
 			logger.log(Logger::ERROR_LVL, "port number must be greater than zero\n");
 			return 0;
@@ -145,16 +174,6 @@ int main(int argc, CHAR* argv[])
 		if (echoServiceMode) {
 			return echoService(config);
 		}
-
-		ULONG result = findHtsVsp(htsvspPortNumber);
-		if (result == ERROR_SUCCESS) {
-			logger << "found htsvsp at \\\\.\\COM" << htsvspPortNumber << "\n";
-		}
-		else {
-			logger << "no htsvsp ports found\n";
-			return result;
-		}
-		logger.flush(Logger::INFO_LVL);
 
 		result = ERROR_SUCCESS;
 		HANDLE handle = configVSp(htsvspPortNumber, config);

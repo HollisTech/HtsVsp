@@ -313,7 +313,10 @@ EvtIoDeviceControl(
             &vspConfig,
             sizeof(vspConfig));
         if (NT_SUCCESS(status)) {
-            if (vspConfig.clientMode) {
+			if (vspConfig.closeConnections) {
+				CloseNetwork(deviceContext);
+			}
+			else if (vspConfig.clientMode) {
                 status = ConfigureClient(&vspConfig, queueContext);
             }
             else {

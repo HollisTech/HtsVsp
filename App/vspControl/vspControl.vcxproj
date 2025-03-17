@@ -140,6 +140,7 @@
     <ClCompile Include="vspControl.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="cxxopts.hpp" />
     <ClInclude Include="DeviceManager.h" />
     <ClInclude Include="Logger.h" />
   </ItemGroup>

@@ -48,7 +48,7 @@ namespace DeviceManager {
          * 
          * @return int 0 on success, non-zero on failure.
          */
-        virtual int uninstallDriver();
+        virtual int uninstallDriver(const std::string& infFile);
 
         /**
          * @brief Lists the devices.
@@ -115,7 +115,7 @@ namespace DeviceManager {
          * 
          * @param regKey The registry key to enumerate.
          */
-        void enumKey(HKEY regKey);
+        virtual void enumKey(HKEY regKey);
 
         /**
          * @brief Gets the full path of a file.
@@ -123,14 +123,14 @@ namespace DeviceManager {
          * @param path The relative path.
          * @return std::string The full path.
          */
-        std::string getFullPath(const std::string& path);
+        virtual std::string getFullPath(const std::string& path);
 
         /**
          * @brief Finds hardware IDs of devices.
          * 
          * @param result Vector to store the found hardware IDs.
          */
-        void findHwIds(std::vector<std::string>& result);
+        virtual void findHwIds(std::vector<std::string>& result);
 
         /**
          * @brief Gets the device information set.
@@ -138,7 +138,7 @@ namespace DeviceManager {
          * @param flags The flags for SetupDiGetClassDevs.
          * @return HDEVINFO The handle to the device information set.
          */
-        HDEVINFO getDevInfoSet(DWORD flags);
+        virtual HDEVINFO getDevInfoSet(DWORD flags);
 
         /**
          * @brief Updates the driver using an INF file.
@@ -146,7 +146,15 @@ namespace DeviceManager {
          * @param infFile The path to the INF file.
          * @return int 0 on success, non-zero on failure.
          */
-        int updateDriver(const std::string& infFile);
+        virtual int updateDriver(const std::string& infFile);
+
+		/**
+		 * @brief Removes the driver using an INF file.
+		 *
+		 * @param infFile The path to the INF file.
+		 * @return BOOL TRUE on success, FALSE on failure.
+		 */
+		virtual BOOL removeDriver(const std::string& infFile);
 
         /**
          * @brief Gets the callback function for removing devices.

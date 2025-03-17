@@ -46,9 +46,9 @@ public:
         std::lock_guard<std::mutex> lock(logMutex);
         if (level <= currentLevel) {
             std::cout << buffer.str() << std::endl;
-            buffer.str(""); // Clear the buffer
-            buffer.clear(); // Clear any error flags
         }
+        buffer.str(""); // Clear the buffer
+        buffer.clear(); // Clear any error flags
     }
 
 private:

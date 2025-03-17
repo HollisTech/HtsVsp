@@ -96,8 +96,14 @@ namespace DeviceManager {
 		_In_ PSP_DEVINFO_DATA DeviceInfoData,
 		_In_ PSP_DRVINFO_DATA DriverInfoData,
 		_In_ DWORD Flags,
-		_Out_opt_ PBOOL NeedReboot
-		);
+		_Out_opt_ PBOOL NeedReboot);
+
+#define DIUNINSTALLDRIVER "DiUninstallDriverA"
+	typedef BOOL(WINAPI* DiUninstallDriverProto)(
+		HWND   hwndParent,
+		LPCSTR InfPath,
+		DWORD  Flags,
+		PBOOL  NeedReboot);
 
 	struct enumContextHeader {
 		HDEVINFO hDevInfo;
@@ -116,11 +122,48 @@ namespace DeviceManager {
 		std::string targetName;
 	};
 	typedef int (*CallbackFunc)(_In_ PVOID context);
+	static LSTATUS getRegValue(HKEY regKey, const std::string& valueName, std::vector<char>& valueData)
+	{
+		DWORD valueDataSize = (DWORD)valueData.size();
+		return RegQueryValueEx(regKey, valueName.c_str(), NULL, NULL, reinterpret_cast<LPBYTE>(valueData.data()), &valueDataSize);
+	}
+
+	static HKEY openDeviceSoftwareKey(
+		HDEVINFO DeviceInfoSet,
+		PSP_DEVINFO_DATA DeviceInfoData)
+	{
+		HKEY regKey = SetupDiOpenDevRegKey(DeviceInfoSet, DeviceInfoData, DICS_FLAG_GLOBAL, 0, DIREG_DRV, KEY_READ);
+		if (regKey == INVALID_HANDLE_VALUE) {
+			logger << "SetupDiOpenDevRegKey DIREG_DRV failed error: " << std::hex << GetLastError() << std::endl;
+			logger.flush(Logger::ERROR_LVL);
+		}
+		else {
+			logger << "\nDIREG_DRV\n";
+			logger.flush(Logger::VERBOSE_LVL);
+		}
+		return regKey;
+	}
+
+	static HKEY openDeviceHardwareKey(
+		HDEVINFO DeviceInfoSet,
+		PSP_DEVINFO_DATA DeviceInfoData)
+	{
+		HKEY regKey = SetupDiOpenDevRegKey(DeviceInfoSet, DeviceInfoData, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
+		if (regKey == INVALID_HANDLE_VALUE) {
+			logger << "SetupDiOpenDevRegKey DIREG_DRV failed error: " << std::hex << GetLastError() << std::endl;
+			logger.flush(Logger::ERROR_LVL);
+		}
+		else {
+			logger << "DIREG_DEV\n";
+			logger.flush(Logger::VERBOSE_LVL);
+		}
+		return regKey;
+	}
 
 	static std::string getPortName(enumContextHeader * context)
 	{
 		std::string portName("");
-		RegKeyHandle regKey(SetupDiOpenDevRegKey(context->hDevInfo, &context->devInfoData, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ));
+		RegKeyHandle regKey(openDeviceHardwareKey(context->hDevInfo, &context->devInfoData));
 		if (regKey.get() == INVALID_HANDLE_VALUE) {
 			// this should not happen
 			logger << "SetupDiOpenDevRegKey DIREG_DRV failed error: " << std::hex << GetLastError() << std::endl;
@@ -197,11 +240,7 @@ namespace DeviceManager {
 		return buffer;
 	}
 
-	static LSTATUS getRegValue(HKEY regKey, const std::string& valueName, std::vector<char>& valueData)
-	{
-		DWORD valueDataSize = (DWORD) valueData.size();
-		return RegQueryValueEx(regKey, valueName.c_str(), NULL, NULL, reinterpret_cast<LPBYTE>(valueData.data()), &valueDataSize);
-	}
+	
 
 	void DeviceManager::enumKey(HKEY regKey)
 	{
@@ -222,7 +261,7 @@ namespace DeviceManager {
 			valueData.resize(valueDataSize);
 			status = getRegValue(regKey, valueName, valueData);
 			if (status != ERROR_SUCCESS) {
-				logger << "Failed to get value data. Error: " << std::hex << status << std::endl;
+				logger << "Failed to get value data. Error: " << std::hex << status << "\n";
 				logger.flush(Logger::ERROR_LVL);
 				break;
 			}
@@ -232,12 +271,10 @@ namespace DeviceManager {
 			switch (valueType) {
 			case REG_EXPAND_SZ: // could use ExpandEnvironmentStrings on the buffer.
 			case REG_SZ:
-				logger << (char*)valueData.data() << std::endl;
-				logger.flush(Logger::INFO_LVL);
+				logger << (char*)valueData.data() << "\n";
 				break;
 			case REG_DWORD:
-				logger << *(DWORD*)valueData.data() << std::endl;
-				logger.flush(Logger::INFO_LVL);
+				logger << *(DWORD*)valueData.data() << "\n";
 				break;
 			case REG_MULTI_SZ:
 			{
@@ -248,8 +285,7 @@ namespace DeviceManager {
 					p += strlen(p) + 1;
 					sep = ',';
 				}
-				logger << std::endl;
-				logger.flush(Logger::INFO_LVL);
+				logger << "\n";
 			}
 			break;
 			case REG_BINARY:
@@ -262,17 +298,16 @@ namespace DeviceManager {
 					sep = ' ';
 				}
 				std::cout.fill(prev);
-				logger << std::dec << std::endl;
-				logger.flush(Logger::INFO_LVL);
+				logger << std::dec << "\n";
 			}
 			break;
 			default:
-				logger << " " << valueType << std::endl;
+				logger << " " << valueType << "\n";
 				break;
 			}
 			index++;
 		}
-		logger << std::endl;
+		logger << "\n";
 	}
 
 	std::string DeviceManager::getFullPath(const std::string& path) {
@@ -292,7 +327,29 @@ namespace DeviceManager {
 		return SetupDiGetClassDevs(getClassGuid(), NULL, NULL, flags);
 	}
 
-	BOOL DeviceManager::uninstallDriver()
+	BOOL DeviceManager::removeDriver(const std::string& infFile)
+	{
+		ModuleHandle hNewDev(LoadLibrary(TEXT("newdev.dll")));
+		if (hNewDev.get() == NULL) {
+			logger << "Failed to load newdev.dll. Error: " << std::hex << GetLastError() << std::endl;
+			logger.flush(Logger::ERROR_LVL);
+			return FALSE;
+		}
+		DiUninstallDriverProto diUninstallDriver = (DiUninstallDriverProto)GetProcAddress(hNewDev.get(), DIUNINSTALLDRIVER);
+		if (diUninstallDriver == NULL) {
+			logger << "Failed to get proc address for DiUninstallDriver. Error: " << std::hex << GetLastError() << std::endl;
+			logger.flush(Logger::ERROR_LVL);
+			return FALSE;
+		}
+		BOOL result = diUninstallDriver(NULL, TEXT(infFile.c_str()), 0, NULL);
+		if (!result) {
+			logger << "Failed to remove the driver. Error: " << std::hex << GetLastError() << std::endl;
+			logger.flush(Logger::ERROR_LVL);
+		}
+		return result;
+	}
+
+	BOOL DeviceManager::uninstallDriver(const std::string& infFile)
 	{
 		DWORD flags = DIGCF_PRESENT;
 		HDevInfoHandle hDevInfo(getDevInfoSet(flags));
@@ -324,6 +381,25 @@ namespace DeviceManager {
 				continue;
 			}
 
+			// get the 'oem' inf file
+			std::vector<char> infBuffer;
+			DWORD infSize = 0;
+			RegKeyHandle regKeyDrv(openDeviceSoftwareKey(hDevInfo.get(), &devInfoData));
+			if (regKeyDrv.get() != INVALID_HANDLE_VALUE) {
+				if (RegQueryValueEx(regKeyDrv.get(), TEXT("InfPath"), NULL, NULL, NULL, &infSize) == ERROR_SUCCESS) {
+					infBuffer.resize(infSize);
+					if (RegQueryValueEx(regKeyDrv.get(), TEXT("InfPath"), NULL, NULL, reinterpret_cast<LPBYTE>(infBuffer.data()), &infSize) != ERROR_SUCCESS) {
+						logger << "Failed to get inf path. Error: " << std::hex << GetLastError() << "\n";
+						logger.flush(Logger::ERROR_LVL);
+					}
+				}
+				else {
+					logger << "Failed to get infpath size. Error: " << std::hex << GetLastError() << "\n";
+					logger.flush(Logger::ERROR_LVL);
+					enumKey(regKeyDrv.get());
+				}
+			}
+
 			SP_REMOVEDEVICE_PARAMS rmdParams{ 0 };
 			rmdParams.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
 			rmdParams.ClassInstallHeader.InstallFunction = DIF_REMOVE;
@@ -339,6 +415,18 @@ namespace DeviceManager {
 				logger.flush(Logger::ERROR_LVL);
 				return FALSE;
 			}
+			if (!infBuffer.empty()) {
+				std::string infPath(infBuffer.data());
+				logger << "Removing driver package for: " << infPath << "\n";
+				logger.flush(Logger::INFO_LVL);
+				// remove the driver
+				if (!SetupUninstallOEMInf(infPath.c_str(), SUOI_FORCEDELETE, NULL)) {
+					logger << "Failed to uninstall driver. Error: " << std::hex << GetLastError() << std::endl;
+					logger.flush(Logger::ERROR_LVL);
+					return FALSE;
+				}
+			}
+
 		}
 		return TRUE;
 	}
@@ -397,38 +485,11 @@ namespace DeviceManager {
 		return result;
 	}
 
-	HKEY openDeviceSoftwareKey(
-		HDEVINFO DeviceInfoSet,
-		PSP_DEVINFO_DATA DeviceInfoData)
-	{
-		HKEY regKey = SetupDiOpenDevRegKey(DeviceInfoSet, DeviceInfoData, DICS_FLAG_GLOBAL, 0, DIREG_DRV, KEY_READ);
-		if (regKey == INVALID_HANDLE_VALUE) {
-			logger << "SetupDiOpenDevRegKey DIREG_DRV failed error: " << std::hex << GetLastError() << std::endl;
-			logger.flush(Logger::ERROR_LVL);
-		}
-		return regKey;
-	}
-
-	HKEY openDeviceHardwareKey(
-		HDEVINFO DeviceInfoSet,
-		PSP_DEVINFO_DATA DeviceInfoData)
-	{
-		HKEY regKey = SetupDiOpenDevRegKey(DeviceInfoSet, DeviceInfoData, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
-		if (regKey == INVALID_HANDLE_VALUE) {
-			logger << "SetupDiOpenDevRegKey DIREG_DRV failed error: " << std::hex << GetLastError() << std::endl;
-			logger.flush(Logger::ERROR_LVL);
-		}
-		return regKey;
-	}
-
 	int SoftwareDeviceManager::installDriver(const std::string& infFile, bool uninstall)
 	{
-		HKEY regKey = (HKEY)INVALID_HANDLE_VALUE;
-		BOOL reboot = FALSE;
-
 		std::string infPath = getFullPath(infFile);
 		if (uninstall) {
-			uninstallDriver();
+			uninstallDriver(infFile);
 			logger << "htsvsp uninstalled" << std::endl;
 			logger.flush(Logger::INFO_LVL);
 		}
@@ -447,7 +508,6 @@ namespace DeviceManager {
 		if (!updateDriver(infPath)) {
 			return 1;
 		}
-
 		return 0;
 	}
 
