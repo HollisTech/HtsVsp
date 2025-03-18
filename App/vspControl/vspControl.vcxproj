@@ -144,6 +144,9 @@
     <ClInclude Include="DeviceManager.h" />
     <ClInclude Include="Logger.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="vspControl.rc" />
+  </ItemGroup>
   <PropertyGroup Condition="'$(ProjectRootPath)' ==''">
     <ProjectRootPath>$([MSBuild]::GetDirectoryNameOfFileAbove('$(MSBuildThisFileDirectory)','BuildTools\build.ps1'))</ProjectRootPath>
   </PropertyGroup>

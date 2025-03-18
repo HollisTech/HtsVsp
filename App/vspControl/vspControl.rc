@@ -1,5 +1,5 @@
 //---------------------------------------------------------------------------
-// Virtualserial.rc
+// vspControl.rc
 //
 // Copyright (c) Microsoft Corporation, All Rights Reserved
 //---------------------------------------------------------------------------
@@ -12,25 +12,25 @@
 #ifdef VER_FILETYPE
 #undef VER_FILETYPE
 #endif
-#define VER_FILETYPE                VFT_DLL
+#define VER_FILETYPE                VFT_APP
 
 #ifdef VER_FILESUBTYPE
 #undef VER_FILESUBTYPE
 #endif
-#define VER_FILESUBTYPE             VFT2_DRV_COMM
+#define VER_FILESUBTYPE             VFT_UNKNOWN
 
 #ifdef VER_FILEDESCRIPTION_STR
 #undef VER_FILEDESCRIPTION_STR
 #endif
-#define VER_FILEDESCRIPTION_STR     "HTS Virtual SerialPort"
+#define VER_FILEDESCRIPTION_STR     "HTS virtual serial port control application"
 
 #ifdef VER_INTERNALNAME_STR
 #undef VER_INTERNALNAME_STR
 #endif
-#define VER_INTERNALNAME_STR        "HtsVsp"
+#define VER_INTERNALNAME_STR        "vspControl"
 
 
 #ifdef VER_ORIGINALFILENAME_STR
 #undef VER_ORIGINALFILENAME_STR
 #endif
-#define VER_ORIGINALFILENAME_STR    "HtsVsp.dll"
+#define VER_ORIGINALFILENAME_STR    "vspControl.exe"
