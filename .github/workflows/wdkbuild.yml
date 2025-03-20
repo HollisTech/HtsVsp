@@ -14,15 +14,15 @@ env:
 jobs:
   build:
     runs-on: [windows-latest]
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
 
     steps:
     - uses: actions/checkout@v4
       with: 
         submodules: 'true'
-
-    - name: Set Outputs
-      id: vars
-      run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
 
     - name: Build
       working-directory: ${{env.GITHUB_WORKSPACE}}
