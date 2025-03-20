@@ -1,0 +1,69 @@
+# This workflow runs the latest CodeQL CLI and checks against CodeQL's Cpp library.
+# This is the source for the GitHub Security Code Scanning job.
+
+name: "CodeQL Analysis"
+
+on:
+  push:
+    branches:
+      - main
+      - feature-*
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+  pull_request:
+    # The branches below must be a subset of the branches above
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+    
+  # Allow manual scheduling
+  workflow_dispatch:
+env:
+
+  SOLUTION_FILE_PATH: .
+  BUILD_CONFIGURATION: Debug
+  EWDKRoot: D:\\
+  TOOLSET: VS2022
+  ARCHIVE_PREFIX: build
+  ARCHIVE_BIN: ${{ true }}
+
+jobs:
+  analyze:
+    name: Analysis
+    runs-on: windows-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'cpp' ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          config-file: microsoft/Windows-Driver-Developer-Supplemental-Tools/config/codeql-config.yml@development
+          packs: +microsoft/windows-drivers@1.2.0-beta
+
+      - name: build
+        run: >
+            .\BuildTools\build.ps1 -toolset ${{env.TOOLSET}} 
+            -configurations ${{env.BUILD_CONFIGURATION}}
+            -buildNumber ${{ github.run_number }} 
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{matrix.language}}"
