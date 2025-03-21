@@ -54,7 +54,8 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
-          config-file: microsoft/Windows-Driver-Developer-Supplemental-Tools/config/codeql-config.yml@development
+          # was @development but that is unstable.
+          config-file: microsoft/Windows-Driver-Developer-Supplemental-Tools/config/codeql-config.yml@9c1627b
           packs: +microsoft/windows-drivers@1.2.0-beta
 
       - name: Setup NuGet
@@ -67,6 +68,15 @@ jobs:
             -buildNumber ${{ github.run_number }} 
 
       - name: Perform CodeQL analysis
+        id: analyze
         uses: github/codeql-action/analyze@v3
         with:
-          category: "/language:${{matrix.language}}"
+          category: "/language:${{matrix.language}}"   
+
+      - name: Archive logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          path:  ${{ steps.analyze.outputs.sarif-output }}
+          name: analysis-results
+          retention-days: 7
