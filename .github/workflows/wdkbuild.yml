@@ -9,20 +9,19 @@ env:
   EWDKRoot: D:\\
   TOOLSET: VS2022
   ARCHIVE_PREFIX: build
-  ARCHIVE_BIN: ${{ true }}
 
 jobs:
   build:
     runs-on: [windows-latest]
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
       with: 
         submodules: 'true'
 
-    - name: Set Outputs
-      id: vars
-      run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+    - name: Setup NuGet
+      run: nuget restore .\packages.config -PackagesDirectory .\packages\ 
 
     - name: Build
       working-directory: ${{env.GITHUB_WORKSPACE}}
@@ -39,7 +38,7 @@ jobs:
         path: logs/**/*.log
 
     - name: Archive Bin
-      if: ${{ env.ARCHIVE_BIN }}
+      if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
         name: ${{env.ARCHIVE_PREFIX}}-bin

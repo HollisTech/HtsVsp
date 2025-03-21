@@ -57,6 +57,9 @@ jobs:
           config-file: microsoft/Windows-Driver-Developer-Supplemental-Tools/config/codeql-config.yml@development
           packs: +microsoft/windows-drivers@1.2.0-beta
 
+      - name: Setup NuGet
+        run: nuget restore .\packages.config -PackagesDirectory .\packages\ 
+
       - name: build
         run: >
             .\BuildTools\build.ps1 -toolset ${{env.TOOLSET}} 
