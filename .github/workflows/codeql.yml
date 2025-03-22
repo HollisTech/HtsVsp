@@ -64,7 +64,7 @@ jobs:
         run: >
             .\BuildTools\build.ps1 -toolset ${{env.TOOLSET}} 
             -configurations ${{env.BUILD_CONFIGURATION}}
-            -buildNumber ${{ github.run_number }} 
+            -buildNumber 0 
 
       - name: Perform CodeQL analysis
         id: analyze
