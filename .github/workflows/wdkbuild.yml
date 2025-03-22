@@ -1,15 +1,13 @@
-name: WDK-Build
+name: "Debug Build"
 
 on: [push,workflow_dispatch]
 
 env:
 
   SOLUTION_FILE_PATH: .
-  BUILD_CONFIGURATION: Release
-  EWDKRoot: D:\\
+  BUILD_CONFIGURATION: Debug
   TOOLSET: VS2022
-  ARCHIVE_PREFIX: build
-  ARCHIVE_BIN: ${{ true }}
+  ARCHIVE_PREFIX: debug-build
 
 jobs:
   build:
@@ -20,10 +18,14 @@ jobs:
       security-events: write
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
       with: 
         submodules: 'true'
-
+        
+    - name: Setup NuGet
+      run: nuget restore .\packages.config -PackagesDirectory .\packages\ 
+      
     - name: Build
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: >
@@ -39,7 +41,7 @@ jobs:
         path: logs/**/*.log
 
     - name: Archive Bin
-      if: ${{ env.ARCHIVE_BIN }}
+      if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
         name: ${{env.ARCHIVE_PREFIX}}-bin
