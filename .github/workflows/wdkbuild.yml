@@ -1,14 +1,13 @@
-name: WDK-Build
+name: "Debug Build"
 
 on: [push,workflow_dispatch]
 
 env:
 
   SOLUTION_FILE_PATH: .
-  BUILD_CONFIGURATION: Release
-  EWDKRoot: D:\\
+  BUILD_CONFIGURATION: Debug
   TOOLSET: VS2022
-  ARCHIVE_PREFIX: build
+  ARCHIVE_PREFIX: debug-build
 
 jobs:
   build:

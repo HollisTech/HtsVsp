@@ -1,7 +1,7 @@
 # This workflow runs the latest CodeQL CLI and checks against CodeQL's Cpp library.
 # This is the source for the GitHub Security Code Scanning job.
 
-name: "CodeQL Analysis"
+name: "CodeQL Analysis and Release Build"
 
 on:
   push:
@@ -21,14 +21,13 @@ on:
     
   # Allow manual scheduling
   workflow_dispatch:
+
 env:
 
   SOLUTION_FILE_PATH: .
-  BUILD_CONFIGURATION: Debug
-  EWDKRoot: D:\\
+  BUILD_CONFIGURATION: Release
   TOOLSET: VS2022
-  ARCHIVE_PREFIX: build
-  ARCHIVE_BIN: ${{ true }}
+  ARCHIVE_PREFIX: release-build
 
 jobs:
   analyze:
@@ -54,8 +53,8 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
-          # was @development but that is unstable.
-          config-file: microsoft/Windows-Driver-Developer-Supplemental-Tools/config/codeql-config.yml@9c1627b
+          config-file: microsoft/Windows-Driver-Developer-Supplemental-Tools/config/codeql-config.yml@4246e2a
+          # config-file: microsoft/Windows-Driver-Developer-Supplemental-Tools/config/codeql-config.yml@9c1627b
           packs: +microsoft/windows-drivers@1.2.0-beta
 
       - name: Setup NuGet
@@ -73,10 +72,24 @@ jobs:
         with:
           category: "/language:${{matrix.language}}"   
 
-      - name: Archive logs
+      - name: Archive Sarif
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           path:  ${{ steps.analyze.outputs.sarif-output }}
           name: analysis-results
           retention-days: 7
+
+      - name: Archive logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{env.ARCHIVE_PREFIX}}-logs
+          path: logs/**/*.log
+    
+      - name: Archive Bin
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{env.ARCHIVE_PREFIX}}-bin
+          path: bin/**/*.*
