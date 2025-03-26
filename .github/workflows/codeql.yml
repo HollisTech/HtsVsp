@@ -53,8 +53,7 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
-          config-file: microsoft/Windows-Driver-Developer-Supplemental-Tools/config/codeql-config.yml@4246e2a
-          # config-file: microsoft/Windows-Driver-Developer-Supplemental-Tools/config/codeql-config.yml@9c1627b
+          config-file: microsoft/Windows-Driver-Developer-Supplemental-Tools/config/codeql-config.yml@development
           packs: +microsoft/windows-drivers@1.2.0-beta
 
       - name: Setup NuGet
