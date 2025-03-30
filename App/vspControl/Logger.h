@@ -12,6 +12,10 @@ public:
         currentLevel = level;
     }
 
+	static Level getLogLevel() {
+		return currentLevel;
+	}
+
     // Log a message if the level is equal to or higher than the current log level
     static void log(Level level, const std::string& message) {
         std::lock_guard<std::mutex> lock(logMutex);

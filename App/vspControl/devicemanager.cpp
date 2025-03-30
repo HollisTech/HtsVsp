@@ -109,6 +109,7 @@ namespace DeviceManager {
 		HDEVINFO hDevInfo;
 		SP_DEVINFO_DATA devInfoData;
 		DWORD Index;
+		DeviceManager* deviceManager;
 	};
 
 	struct enumPortsListContext {
@@ -121,7 +122,7 @@ namespace DeviceManager {
 		enumContextHeader header;
 		std::string targetName;
 	};
-	typedef int (*CallbackFunc)(_In_ PVOID context);
+
 	static LSTATUS getRegValue(HKEY regKey, const std::string& valueName, std::vector<char>& valueData)
 	{
 		DWORD valueDataSize = (DWORD)valueData.size();
@@ -137,10 +138,6 @@ namespace DeviceManager {
 			logger << "SetupDiOpenDevRegKey DIREG_DRV failed error: " << std::hex << GetLastError() << std::endl;
 			logger.flush(Logger::ERROR_LVL);
 		}
-		else {
-			logger << "\nDIREG_DRV\n";
-			logger.flush(Logger::VERBOSE_LVL);
-		}
 		return regKey;
 	}
 
@@ -152,10 +149,6 @@ namespace DeviceManager {
 		if (regKey == INVALID_HANDLE_VALUE) {
 			logger << "SetupDiOpenDevRegKey DIREG_DRV failed error: " << std::hex << GetLastError() << std::endl;
 			logger.flush(Logger::ERROR_LVL);
-		}
-		else {
-			logger << "DIREG_DEV\n";
-			logger.flush(Logger::VERBOSE_LVL);
 		}
 		return regKey;
 	}
@@ -181,42 +174,7 @@ namespace DeviceManager {
 		return portName;
 	}
 
-	static int removePortCallback(PVOID context)
-	{
-		enumPortsRemoveContext* ctx = (enumPortsRemoveContext*)context;
-		std::string portName = getPortName(&ctx->header);
-		if (portName == ctx->targetName) {
-			// found the port to remove
-			SP_REMOVEDEVICE_PARAMS rmdParams{ 0 };
-			rmdParams.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
-			rmdParams.ClassInstallHeader.InstallFunction = DIF_REMOVE;
-			rmdParams.Scope = DI_REMOVEDEVICE_GLOBAL;
-			rmdParams.HwProfile = 0;
-			if (!SetupDiSetClassInstallParams(ctx->header.hDevInfo, &ctx->header.devInfoData, &rmdParams.ClassInstallHeader, sizeof(rmdParams))) {
-				logger << "Failed to set class install DIF_REMOVE params. Error: " << std::hex << GetLastError() << std::endl;
-				logger.flush(Logger::ERROR_LVL);
-				return 1;
-			}
-			if (!SetupDiCallClassInstaller(DIF_REMOVE, ctx->header.hDevInfo, &ctx->header.devInfoData)) {
-				logger << "Failed to call class installer for DIF_REMOVE. Error: " << std::hex << GetLastError() << std::endl;
-				logger.flush(Logger::ERROR_LVL);
-				return 1;
-			}
-			// terminate the enumeration
-			return 1;
-		}
-		return 0;
-	}
-
-	static int listPortCallback(PVOID context)
-	{
-		enumPortsListContext* ctx = (enumPortsListContext*)context;
-		logger << ctx->sep << getPortName(&ctx->header);
-		ctx->sep = ", ";
-		return 0;
-	}
-
-	static std::vector<char> getDeviceHwIds(
+		static std::vector<char> getDeviceHwIds(
 		HDEVINFO hDevInfo,
 		SP_DEVINFO_DATA devInfoData)
 	{
@@ -246,16 +204,16 @@ namespace DeviceManager {
 	{
 		// enumerate key
 		CHAR valueName[256];
-		DWORD valueNameSize = sizeof(valueName);
 		DWORD valueType;
 		DWORD index = 0;
 		LSTATUS status = ERROR_SUCCESS;
-		// this is bullshit. Instead get the size of the value name and data first then correctly fetch the value name and data.
+		
 		while (status == ERROR_SUCCESS) {
 			std::vector<char> valueData;
 			DWORD valueDataSize = 0;
+			DWORD valueNameSize = sizeof(valueName);
 			status = RegEnumValue(regKey, index, valueName, &valueNameSize, NULL, &valueType, NULL, &valueDataSize);
-			if (status != ERROR_MORE_DATA) {
+			if (status != ERROR_SUCCESS) {
 				break;
 			}
 			valueData.resize(valueDataSize);
@@ -307,7 +265,6 @@ namespace DeviceManager {
 			}
 			index++;
 		}
-		logger << "\n";
 	}
 
 	std::string DeviceManager::getFullPath(const std::string& path) {
@@ -508,6 +465,22 @@ namespace DeviceManager {
 		if (!updateDriver(infPath)) {
 			return 1;
 		}
+		RegKeyHandle regKeyDrv(openDeviceSoftwareKey(hDevInfo.get(), &devInfoData));
+		if (regKeyDrv.get() == INVALID_HANDLE_VALUE) {
+			logger << "Failed to open device software key. Error: " << std::hex << GetLastError() << std::endl;
+			logger.flush(Logger::ERROR_LVL);
+		}
+		else {
+			enumKey(regKeyDrv.get());
+		}
+		RegKeyHandle regKeyDev(openDeviceHardwareKey(hDevInfo.get(), &devInfoData));
+		if (regKeyDev.get() == INVALID_HANDLE_VALUE) {
+			logger << "Failed to open device hardware key. Error: " << std::hex << GetLastError() << std::endl;
+			logger.flush(Logger::ERROR_LVL);
+		}
+		else {
+			enumKey(regKeyDev.get());
+		}
 		return 0;
 	}
 
@@ -516,7 +489,6 @@ namespace DeviceManager {
 		enumPortsListContext listContext = { 0 };
 		listContext.sep = "";
 		int retval = enumClassDevices(ListCallback(), (PVOID)&listContext);
-		logger << std::endl;
 		logger.flush(Logger::INFO_LVL);
 		return retval;
 	}
@@ -558,10 +530,9 @@ namespace DeviceManager {
 				currStringPtr += currStringLength + 1;
 			}
 			if (match && callback(context)) {
-				// callback returned non-zero. stop
 				break;
-				retval = 0;
 			}
+			retval = 0;
 		}
 		return retval;
 	}
@@ -667,8 +638,76 @@ namespace DeviceManager {
 		BOOL result = diInstallDevice(NULL, hDevInfo, DeviceInfoData, NULL, 0, NULL);
 		return result;
 	}
+	
+	int PortDeviceManager::removePortCallback(PVOID context)
+	{
+		enumPortsRemoveContext* ctx = (enumPortsRemoveContext*)context;
+		std::string portName = getPortName(&ctx->header);
+		if (portName == ctx->targetName) {
+			// found the port to remove
+			SP_REMOVEDEVICE_PARAMS rmdParams{ 0 };
+			rmdParams.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
+			rmdParams.ClassInstallHeader.InstallFunction = DIF_REMOVE;
+			rmdParams.Scope = DI_REMOVEDEVICE_GLOBAL;
+			rmdParams.HwProfile = 0;
+			if (!SetupDiSetClassInstallParams(ctx->header.hDevInfo, &ctx->header.devInfoData, &rmdParams.ClassInstallHeader, sizeof(rmdParams))) {
+				logger << "Failed to set class install DIF_REMOVE params. Error: " << std::hex << GetLastError() << std::endl;
+				logger.flush(Logger::ERROR_LVL);
+				return 1;
+			}
+			if (!SetupDiCallClassInstaller(DIF_REMOVE, ctx->header.hDevInfo, &ctx->header.devInfoData)) {
+				logger << "Failed to call class installer for DIF_REMOVE. Error: " << std::hex << GetLastError() << std::endl;
+				logger.flush(Logger::ERROR_LVL);
+				return 1;
+			}
+			// terminate the enumeration
+			return 1;
+		}
+		return 0;
+	}
 
-	CallbackFunc PortDeviceManager::RemoveCallback() { return removePortCallback; }
-	CallbackFunc PortDeviceManager::ListCallback() { return listPortCallback; }
+	int PortDeviceManager::listPortCallback(PVOID context)
+	{
+		enumPortsListContext* ctx = (enumPortsListContext*)context;
+		if (logger.getLogLevel() == Logger::VERBOSE_LVL) {
+			RegKeyHandle regHwKey(openDeviceHardwareKey(ctx->header.hDevInfo, &ctx->header.devInfoData));
+			if (regHwKey.get() == INVALID_HANDLE_VALUE) {
+				// this should not happen
+				logger << "SetupDiOpenDevRegKey DIREG_DRV failed error: " << std::hex << GetLastError() << std::endl;
+				logger.flush(Logger::ERROR_LVL);
+			}
+			else {
+				enumKey(regHwKey.get());
+			}
+			RegKeyHandle regSwKey(openDeviceSoftwareKey(ctx->header.hDevInfo, &ctx->header.devInfoData));
+			if (regSwKey.get() == INVALID_HANDLE_VALUE) {
+				// this should not happen
+				logger << "SetupDiOpenDevRegKey DIREG_DRV failed error: " << std::hex << GetLastError() << std::endl;
+				logger.flush(Logger::ERROR_LVL);
+			}
+			else {
+				enumKey(regSwKey.get());
+			}
+			logger.flush(Logger::INFO_LVL);
+		}
+		else {
+			std::string portName = getPortName(&ctx->header);
+			logger << ctx->sep << portName;
+			ctx->sep = ", ";
+		}
+		return 0;
+	}
+
+	CallbackFunc PortDeviceManager::RemoveCallback() 
+	{
+		CallbackFunc f = std::bind(&PortDeviceManager::listPortCallback, this, std::placeholders::_1);
+		return  f;
+	}
+
+	CallbackFunc PortDeviceManager::ListCallback()
+	{
+		CallbackFunc f = std::bind(&PortDeviceManager::listPortCallback, this, std::placeholders::_1);
+		return f;
+	}
 
 }
