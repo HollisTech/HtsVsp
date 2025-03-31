@@ -3,10 +3,102 @@
 #include <SetupAPI.h>
 #include <string>
 #include <devguid.h>
+#include <iostream>
 #include <vector>
 #include <functional>
+#include <infstr.h>
+#include <sstream>
+#include <filesystem>
+#include <iomanip>
+#include <algorithm>
 
 namespace DeviceManager {
+    
+    class HDevInfoHandle {
+    public:
+        HDevInfoHandle(HDEVINFO hDevInfo) : _hDevInfo(hDevInfo) {}
+        ~HDevInfoHandle() {
+            if (_hDevInfo != INVALID_HANDLE_VALUE) {
+                SetupDiDestroyDeviceInfoList(_hDevInfo);
+            }
+        }
+        HDEVINFO get() {
+            return _hDevInfo;
+        }
+    private:
+        HDEVINFO _hDevInfo;
+    };
+
+    class RegKeyHandle {
+    public:
+        RegKeyHandle(HKEY hKey) : _hKey(hKey) {}
+        ~RegKeyHandle() {
+            if (_hKey) {
+                RegCloseKey(_hKey);
+            }
+        }
+        HKEY get() const { return _hKey; }
+
+    private:
+        HKEY _hKey;
+    };
+
+    class ModuleHandle {
+
+    public:
+        explicit ModuleHandle(HMODULE handle) : handle_(handle) {}
+
+        ~ModuleHandle() {
+            if (handle_ != NULL) {
+                FreeLibrary(handle_);
+            }
+        }
+
+        // Prevent copying
+        ModuleHandle(const ModuleHandle&) = delete;
+        ModuleHandle& operator=(const ModuleHandle&) = delete;
+
+        // Allow moving
+        ModuleHandle(ModuleHandle&& other) noexcept : handle_(other.handle_) {
+            other.handle_ = NULL;
+        }
+
+        ModuleHandle& operator=(ModuleHandle&& other) noexcept {
+            if (this != &other) {
+                if (handle_ != NULL) {
+                    FreeLibrary(handle_);
+                }
+                handle_ = other.handle_;
+                other.handle_ = NULL;
+            }
+            return *this;
+        }
+
+        HMODULE get() const { return handle_; }
+
+        bool isValid() const { return handle_ != NULL; }
+
+    private:
+        HMODULE handle_;
+    };
+
+    struct enumContext {
+        HDEVINFO hDevInfo;
+        SP_DEVINFO_DATA devInfoData;
+        DWORD Index;
+    };
+
+    struct enumListContext : enumContext {
+        std::string sep;
+
+    };
+
+    struct enumRemoveContext : enumContext {
+        std::string targetName;
+        bool found;
+    };
+
+    std::string str_toupper(std::string s);
 
     /**
      * @brief Callback function type for device enumeration.
@@ -14,8 +106,8 @@ namespace DeviceManager {
      * @param context User-defined context passed to the callback function.
      * @return int Return 0 to continue enumeration, non-zero to stop.
      */
-    //typedef int (*CallbackFunc)(_In_ PVOID context);
-#define CallbackFunc std::function<int(PVOID)>
+     //typedef int (*CallbackFunc)(_In_ PVOID context);
+#define CallbackFunc std::function<int(enumContext*)>
 
     /**
      * @brief Base class for managing devices.
@@ -181,9 +273,7 @@ namespace DeviceManager {
          * @param flags The flags for SetupDiGetClassDevs.
          * @return int 0 on success, non-zero on failure.
          */
-        virtual int enumClassDevices(CallbackFunc callback, PVOID context, DWORD flags = DIGCF_PRESENT);
-
-
+        virtual int enumClassDevices(CallbackFunc callback, enumContext * context, DWORD flags = DIGCF_PRESENT);
 
         /**
          * @brief Creates a new device information set.
@@ -192,6 +282,59 @@ namespace DeviceManager {
          * @return HDEVINFO The handle to the new device information set.
          */
         virtual HDEVINFO createNewDeviceInfoSet(SP_DEVINFO_DATA* devInfoData);
+
+        /**
+         * @brief Gets the port name.
+         *
+         * @param context The context header containing device information.
+         * @return std::string The port name.
+         */
+        std::string getPortName(enumContext* context);
+
+        /**
+         * @brief Opens the hardware key for a device.
+         *
+         * @param DeviceInfoSet The handle to the device information set.
+         * @param DeviceInfoData The device information data.
+         * @return HKEY The handle to the opened hardware key.
+         */
+        HKEY openDeviceHardwareKey(
+            HDEVINFO DeviceInfoSet,
+            PSP_DEVINFO_DATA DeviceInfoData);
+
+        /**
+         * @brief Opens the software key for a device.
+         *
+         * @param DeviceInfoSet The handle to the device information set.
+         * @param DeviceInfoData The device information data.
+         * @return HKEY The handle to the opened software key.
+         */
+        HKEY openDeviceSoftwareKey(
+            HDEVINFO DeviceInfoSet,
+            PSP_DEVINFO_DATA DeviceInfoData);
+
+        /**
+         * @brief Gets a registry value.
+         *
+         * @param regKey The handle to the registry key.
+         * @param valueName The name of the value to retrieve.
+         * @param valueData The buffer to store the value data.
+         * @return LSTATUS The status of the registry query.
+         */
+        LSTATUS getRegValue(HKEY regKey,
+            const std::string& valueName,
+            std::vector<char>& valueData);
+
+        /**
+         * @brief Gets the hardware IDs of a device.
+         *
+         * @param hDevInfo The handle to the device information set.
+         * @param devInfoData The device information data.
+         * @return std::vector<char> The hardware IDs of the device.
+         */
+        std::vector<char> getDeviceHwIds(
+            HDEVINFO hDevInfo,
+            SP_DEVINFO_DATA devInfoData);
 
     private:
         GUID classGuid;              ///< The GUID of the device class.
@@ -263,47 +406,5 @@ namespace DeviceManager {
         // Prevent copying
         SoftwareDeviceManager(const SoftwareDeviceManager& other) = delete;
         SoftwareDeviceManager& operator=(const SoftwareDeviceManager& other) = delete;
-    };
-
-    /**
-     * @brief Derived class for managing port devices.
-     *
-     * Specializes in managing port devices and provides methods for listing and removing port devices.
-     */
-    class PortDeviceManager : public SoftwareDeviceManager {
-    public:
-        /**
-         * @brief Constructs a PortDeviceManager object.
-         *
-         * @param HwId The hardware ID of the port device.
-         */
-        PortDeviceManager(const char* HwId)
-            : SoftwareDeviceManager("PORTS", GUID_DEVCLASS_PORTS, HwId) {
-        }
-
-        virtual ~PortDeviceManager() {}
-
-        /**
-         * @brief Gets the callback function for removing port devices.
-         *
-         * @return CallbackFunc The callback function.
-         */
-        virtual CallbackFunc RemoveCallback();
-
-        /**
-         * @brief Gets the callback function for listing port devices.
-         *
-         * @return CallbackFunc The callback function.
-         */
-        virtual CallbackFunc ListCallback();
-
-        int removePortCallback(PVOID context);
-
-        int listPortCallback(PVOID context);
-
-    private:
-        // Prevent copying
-        PortDeviceManager(const PortDeviceManager& other) = delete;
-        PortDeviceManager& operator=(const PortDeviceManager& other) = delete;
     };
 }
