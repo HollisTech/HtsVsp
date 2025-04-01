@@ -2,6 +2,7 @@
 /logs
 /packages
 inc/ntverp.h
+inc/buildnumber.props
 x64/
 .vs/
 *.user
