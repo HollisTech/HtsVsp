@@ -68,7 +68,7 @@ namespace DeviceManager {
     {
         std::string portName("");
         RegKeyHandle regKey(openDeviceHardwareKey(context->hDevInfo, &context->devInfoData));
-        if (regKey.get() == INVALID_HANDLE_VALUE) {
+        if (!regKey.isValid()) {
             // this should not happen
             logger << "SetupDiOpenDevRegKey DIREG_DRV failed error: " << std::hex << GetLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
@@ -198,7 +198,7 @@ namespace DeviceManager {
     BOOL DeviceManager::removeDriver(const std::string& infFile)
     {
         ModuleHandle hNewDev(LoadLibrary(TEXT("newdev.dll")));
-        if (hNewDev.get() == NULL) {
+        if (!hNewDev.isValid()) {
             logger << "Failed to load newdev.dll. Error: " << std::hex << GetLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
             return FALSE;
@@ -222,7 +222,7 @@ namespace DeviceManager {
         DWORD flags = DIGCF_PRESENT;
         HDevInfoHandle hDevInfo(getDevInfoSet(flags));
 
-        if (hDevInfo.get() == INVALID_HANDLE_VALUE) {
+        if (hDevInfo.isValid()) {
             logger << "Failed to get class devices. Error: " << std::hex << GetLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
             return FALSE;
@@ -253,7 +253,7 @@ namespace DeviceManager {
             std::vector<char> infBuffer;
             DWORD infSize = 0;
             RegKeyHandle regKeyDrv(openDeviceSoftwareKey(hDevInfo.get(), &devInfoData));
-            if (regKeyDrv.get() != INVALID_HANDLE_VALUE) {
+            if (regKeyDrv.isValid()) {
                 if (RegQueryValueEx(regKeyDrv.get(), TEXT("InfPath"), NULL, NULL, NULL, &infSize) == ERROR_SUCCESS) {
                     infBuffer.resize(infSize);
                     if (RegQueryValueEx(regKeyDrv.get(), TEXT("InfPath"), NULL, NULL, reinterpret_cast<LPBYTE>(infBuffer.data()), &infSize) != ERROR_SUCCESS) {
@@ -303,7 +303,7 @@ namespace DeviceManager {
     {
         DWORD flags = DIGCF_PRESENT;
         HDevInfoHandle hDevInfo(getDevInfoSet(flags));
-        if (hDevInfo.get() == INVALID_HANDLE_VALUE) {
+        if (hDevInfo.isValid()) {
             logger << "Failed to get class devices. Error: " << std::hex << GetLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
             return;
@@ -334,7 +334,7 @@ namespace DeviceManager {
     BOOL DeviceManager::updateDriver(const std::string& infFile)
     {
         ModuleHandle hNewDev(LoadLibrary(TEXT("newdev.dll")));
-        if (hNewDev.get() == NULL) {
+        if (!hNewDev.isValid()) {
             logger << "Failed to load newdev.dll. Error: " << std::hex << GetLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
             return FALSE;
@@ -363,7 +363,7 @@ namespace DeviceManager {
         }
         SP_DEVINFO_DATA devInfoData;
         HDevInfoHandle hDevInfo(createNewDeviceInfoSet(&devInfoData));
-        if (hDevInfo.get() == INVALID_HANDLE_VALUE) {
+        if (!hDevInfo.isValid()) {
             logger << "SetupDiCreateDeviceInfoList failed error: " << std::hex << GetLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
             return 1;
@@ -376,21 +376,21 @@ namespace DeviceManager {
         if (!updateDriver(infPath)) {
             return 1;
         }
-        RegKeyHandle regKeyDrv(openDeviceSoftwareKey(hDevInfo.get(), &devInfoData));
-        if (regKeyDrv.get() == INVALID_HANDLE_VALUE) {
+        RegKeyHandle regKey(openDeviceSoftwareKey(hDevInfo.get(), &devInfoData));
+        if (!regKey.isValid()) {
             logger << "Failed to open device software key. Error: " << std::hex << GetLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
         }
         else {
-            enumKey(regKeyDrv.get());
+            enumKey(regKey.get());
         }
-        RegKeyHandle regKeyDev(openDeviceHardwareKey(hDevInfo.get(), &devInfoData));
-        if (regKeyDev.get() == INVALID_HANDLE_VALUE) {
+        regKey = openDeviceHardwareKey(hDevInfo.get(), &devInfoData);
+        if (!regKey.isValid()) {
             logger << "Failed to open device hardware key. Error: " << std::hex << GetLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
         }
         else {
-            enumKey(regKeyDev.get());
+            enumKey(regKey.get());
         }
         return 0;
     }
@@ -412,7 +412,7 @@ namespace DeviceManager {
         int retval = 1;
         HKEY regKey = (HKEY)INVALID_HANDLE_VALUE;
         HDevInfoHandle hDevInfo(getDevInfoSet(flags));
-        if (hDevInfo.get() == INVALID_HANDLE_VALUE) {
+        if (hDevInfo.isValid()) {
             logger << "Failed to get class devices. Error: " << GetLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
             return retval;
@@ -502,7 +502,7 @@ namespace DeviceManager {
     {
         SP_DEVINFO_DATA devInfoData;
         HDevInfoHandle hDevInfo(createNewDeviceInfoSet(&devInfoData));
-        if (hDevInfo.get() == INVALID_HANDLE_VALUE) {
+        if (hDevInfo.isValid()) {
             logger << "SetupDiCreateDeviceInfoList failed error: " << std::hex << GetLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
             return 1;
@@ -531,7 +531,7 @@ namespace DeviceManager {
     BOOL SoftwareDeviceManager::installDevice(HDEVINFO hDevInfo, SP_DEVINFO_DATA* DeviceInfoData)
     {
         ModuleHandle hNewDev( LoadLibrary(TEXT("newdev.dll")));
-        if (hNewDev.get() == NULL) {
+        if (!hNewDev.isValid()) {
             logger << "Failed to load newdev.dll. Error: " << std::hex << GetLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
             return FALSE;

@@ -25,6 +25,8 @@ namespace DeviceManager {
         HDEVINFO get() {
             return _hDevInfo;
         }
+
+        bool isValid() const { return _hDevInfo != INVALID_HANDLE_VALUE; }
     private:
         HDEVINFO _hDevInfo;
     };
@@ -37,7 +39,27 @@ namespace DeviceManager {
                 RegCloseKey(_hKey);
             }
         }
+
+        // No Copy constructor
+        RegKeyHandle(const RegKeyHandle& other) = delete;
+
+        // No Copy assignment operator
+        RegKeyHandle& operator=(const RegKeyHandle& other) = delete;
+
+        // Assignment operator
+        RegKeyHandle& operator=(HKEY hKey) {
+            if (_hKey != hKey) {
+                if (_hKey) {
+                    RegCloseKey(_hKey);
+                }
+                _hKey = hKey;
+            }
+            return *this;
+        }
+
         HKEY get() const { return _hKey; }
+
+        bool isValid() const { return _hKey != NULL; }
 
     private:
         HKEY _hKey;
