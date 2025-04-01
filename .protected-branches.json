@@ -1,0 +1,8 @@
+{
+    "append": true,
+    "regex" : true,
+    "protected" : [
+        "release-.*"
+    ]
+ 
+}
