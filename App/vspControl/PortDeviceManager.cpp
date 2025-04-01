@@ -36,23 +36,23 @@ int PortDeviceManager::listPortCallback(enumContext* context)
 {
     enumListContext* ctx = (enumListContext*)context;
     if (logger.getLogLevel() == Logger::VERBOSE_LVL) {
-        RegKeyHandle regHwKey(openDeviceHardwareKey(ctx->hDevInfo, &ctx->devInfoData));
-        if (regHwKey.get() == INVALID_HANDLE_VALUE) {
+        RegKeyHandle regKey(openDeviceHardwareKey(ctx->hDevInfo, &ctx->devInfoData));
+        if (!regKey.isValid()) {
             // this should not happen
             logger << "SetupDiOpenDevRegKey DIREG_DRV failed error: " << std::hex << GetLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
         }
         else {
-            enumKey(regHwKey.get());
+            enumKey(regKey.get());
         }
-        RegKeyHandle regSwKey(openDeviceSoftwareKey(ctx->hDevInfo, &ctx->devInfoData));
-        if (regSwKey.get() == INVALID_HANDLE_VALUE) {
+        regKey = openDeviceSoftwareKey(ctx->hDevInfo, &ctx->devInfoData);
+        if (!regKey.isValid()) {
             // this should not happen
             logger << "SetupDiOpenDevRegKey DIREG_DRV failed error: " << std::hex << GetLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
         }
         else {
-            enumKey(regSwKey.get());
+            enumKey(regKey.get());
         }
         logger.flush(Logger::INFO_LVL);
     }
