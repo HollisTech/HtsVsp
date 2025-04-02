@@ -72,10 +72,11 @@ jobs:
           category: "/language:${{matrix.language}}"   
 
       - name: Archive Sarif
-        if: ${{ always() }}
+        if: ${{ hashFiles(steps.analyze.outputs.sarif-output) }}
         uses: actions/upload-artifact@v4
         with:
           path:  ${{ steps.analyze.outputs.sarif-output }}
+          if-no-files-found: warn
           name: analysis-results
           retention-days: 7
 
