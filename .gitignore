@@ -2,11 +2,13 @@
 /logs
 /packages
 inc/ntverp.h
+inc/buildnumber.props
 x64/
 .vs/
 *.user
 .vscode/
 *.aps
+*.sarif
 ComPort/installDriver.ps1
 ComPort/removeDriver.ps1
 sympath.json
