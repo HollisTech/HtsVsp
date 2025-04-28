@@ -6,6 +6,7 @@ env:
 
   SOLUTION_FILE_PATH: .
   BUILD_CONFIGURATION: Debug
+  BUILD_PLATFORM: x64,arm64
   TOOLSET: VS2022
   ARCHIVE_PREFIX: debug-build
 
@@ -31,7 +32,8 @@ jobs:
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: >
         .\BuildTools\build.ps1 -toolset ${{env.TOOLSET}} 
-        -configurations ${{env.BUILD_CONFIGURATION}}
+        -configurations ${{env.BUILD_CONFIGURATION}} 
+        -platforms ${{env.BUILD_PLATFORM}}
 
     - name: Archive logs
       if: ${{ always() }}

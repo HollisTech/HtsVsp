@@ -4,6 +4,7 @@
 inc/ntverp.h
 inc/buildnumber.props
 x64/
+ARM64/
 .vs/
 *.user
 .vscode/
