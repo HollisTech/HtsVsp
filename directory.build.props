@@ -12,7 +12,7 @@
 <Import Project="packages\Microsoft.Windows.SDK.CPP.arm64.10.0.26100.3323\build\native\Microsoft.Windows.SDK.cpp.arm64.props" 
     Condition="Exists('packages\Microsoft.Windows.SDK.CPP.arm64.10.0.26100.3323\build\native\Microsoft.Windows.SDK.cpp.arm64.props') and '$(Platform)' == 'ARM64'"/>
 
-<Import Project="packages\Microsoft.Windows.SDK.CPP.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.props" 
-    Condition="Exists('packages\Microsoft.Windows.SDK.CPP.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.props')"/> 
+<Import Project="packages\Microsoft.Windows.SDK.CPP.10.0.26100.3323\build\native\Microsoft.Windows.SDK.cpp.props" 
+    Condition="Exists('packages\Microsoft.Windows.SDK.CPP.10.0.26100.3323\build\native\Microsoft.Windows.SDK.cpp.props')"/> 
 
 </Project> 
