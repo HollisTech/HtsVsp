@@ -144,12 +144,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="devapi.cpp" />
     <ClCompile Include="devicemanager.cpp" />
     <ClCompile Include="PortDeviceManager.cpp" />
     <ClCompile Include="vspControl.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cxxopts.hpp" />
+    <ClInclude Include="devapi.h" />
     <ClInclude Include="DeviceManager.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="PortDeviceManager.h" />

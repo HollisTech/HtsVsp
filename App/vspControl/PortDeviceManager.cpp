@@ -3,6 +3,27 @@
 using namespace DeviceManager;
 extern Logger logger;
 
+std::string PortDeviceManager::getPortName(enumContext* context)
+{
+    std::string portName("");
+    RegKeyHandle regKey(openDeviceHardwareKey(context->hDevInfo, &context->devInfoData), api());
+    if (!regKey.isValid()) {
+        // this should not happen
+        logger << "SetupDiOpenDevRegKey DIREG_DRV failed error: " << std::hex << api()->getLastError() << std::endl;
+        logger.flush(Logger::ERROR_LVL);
+    }
+    else {
+        DWORD portNameSize = 0;
+        if (api()->RegQueryValueEx(regKey.get(), TEXT("PortName"), NULL, NULL, &portNameSize) == ERROR_SUCCESS) {
+            std::vector<char> buffer(portNameSize);
+            if (api()->RegQueryValueEx(regKey.get(), TEXT("PortName"), NULL, (LPBYTE)buffer.data(), &portNameSize) == ERROR_SUCCESS) {
+                portName = std::string(buffer.data());
+            }
+        }
+    }
+    return portName;
+}
+
 
 int PortDeviceManager::removePortCallback(enumContext* context)
 {
@@ -15,13 +36,13 @@ int PortDeviceManager::removePortCallback(enumContext* context)
         rmdParams.ClassInstallHeader.InstallFunction = DIF_REMOVE;
         rmdParams.Scope = DI_REMOVEDEVICE_GLOBAL;
         rmdParams.HwProfile = 0;
-        if (!SetupDiSetClassInstallParams(ctx->hDevInfo, &ctx->devInfoData, &rmdParams.ClassInstallHeader, sizeof(rmdParams))) {
-            logger << "Failed to set class install DIF_REMOVE params. Error: " << std::hex << GetLastError() << std::endl;
+        if (!api()->SetupDiSetClassInstallParams(ctx->hDevInfo, &ctx->devInfoData, &rmdParams.ClassInstallHeader, sizeof(rmdParams))) {
+            logger << "Failed to set class install DIF_REMOVE params. Error: " << std::hex << api()->getLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
             return 1;
         }
-        if (!SetupDiCallClassInstaller(DIF_REMOVE, ctx->hDevInfo, &ctx->devInfoData)) {
-            logger << "Failed to call class installer for DIF_REMOVE. Error: " << std::hex << GetLastError() << std::endl;
+        if (!api()->SetupDiCallClassInstaller(DIF_REMOVE, ctx->hDevInfo, &ctx->devInfoData)) {
+            logger << "Failed to call class installer for DIF_REMOVE. Error: " << std::hex << api()->getLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
             return 1;
         }
@@ -36,10 +57,10 @@ int PortDeviceManager::listPortCallback(enumContext* context)
 {
     enumListContext* ctx = (enumListContext*)context;
     if (logger.getLogLevel() == Logger::VERBOSE_LVL) {
-        RegKeyHandle regKey(openDeviceHardwareKey(ctx->hDevInfo, &ctx->devInfoData));
+        RegKeyHandle regKey(openDeviceHardwareKey(ctx->hDevInfo, &ctx->devInfoData), api());
         if (!regKey.isValid()) {
             // this should not happen
-            logger << "SetupDiOpenDevRegKey DIREG_DRV failed error: " << std::hex << GetLastError() << std::endl;
+            logger << "SetupDiOpenDevRegKey DIREG_DRV failed error: " << std::hex << api()->getLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
         }
         else {
@@ -48,7 +69,7 @@ int PortDeviceManager::listPortCallback(enumContext* context)
         regKey = openDeviceSoftwareKey(ctx->hDevInfo, &ctx->devInfoData);
         if (!regKey.isValid()) {
             // this should not happen
-            logger << "SetupDiOpenDevRegKey DIREG_DRV failed error: " << std::hex << GetLastError() << std::endl;
+            logger << "SetupDiOpenDevRegKey DIREG_DRV failed error: " << std::hex << api()->getLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
         }
         else {

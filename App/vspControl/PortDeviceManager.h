@@ -14,8 +14,8 @@ public:
      *
      * @param HwId The hardware ID of the port device.
      */
-    PortDeviceManager(const char* HwId)
-        : SoftwareDeviceManager("PORTS", GUID_DEVCLASS_PORTS, HwId) {
+    PortDeviceManager(const char* HwId, ISystemApi* api)
+        : SoftwareDeviceManager("PORTS", GUID_DEVCLASS_PORTS, HwId, api) {
     }
 
     virtual ~PortDeviceManager() {}
@@ -37,6 +37,8 @@ public:
     int removePortCallback(enumContext * context);
 
     int listPortCallback(enumContext* context);
+
+    std::string getPortName(enumContext* context);
 
 private:
     // Prevent copying

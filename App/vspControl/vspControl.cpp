@@ -68,7 +68,8 @@ int main(int argc, CHAR* argv[])
             ("install", "install driver, requires path to the inf file.", cxxopts::value<std::string>())
             ("uninstall", "uninstall driver, requires path to the inf file.", cxxopts::value<std::string>());
 
-        PortDeviceManager portDevice("UMDF\\HtsVsp");
+        SystemApi api;
+        PortDeviceManager portDevice("UMDF\\HtsVsp", &api);
 
         auto optResult = options.parse(argc, argv);
         if (optResult.count("verbose")) {

@@ -11,98 +11,10 @@
 #include <filesystem>
 #include <iomanip>
 #include <algorithm>
+#include "Logger.h"
+#include "devapi.h"
 
-namespace DeviceManager {
-    
-    class HDevInfoHandle {
-    public:
-        HDevInfoHandle(HDEVINFO hDevInfo) : _hDevInfo(hDevInfo) {}
-        ~HDevInfoHandle() {
-            if (_hDevInfo != INVALID_HANDLE_VALUE) {
-                SetupDiDestroyDeviceInfoList(_hDevInfo);
-            }
-        }
-        HDEVINFO get() {
-            return _hDevInfo;
-        }
-
-        bool isValid() const { return _hDevInfo != INVALID_HANDLE_VALUE; }
-    private:
-        HDEVINFO _hDevInfo;
-    };
-
-    class RegKeyHandle {
-    public:
-        RegKeyHandle(HKEY hKey) : _hKey(hKey) {}
-        ~RegKeyHandle() {
-            if (_hKey) {
-                RegCloseKey(_hKey);
-            }
-        }
-
-        // No Copy constructor
-        RegKeyHandle(const RegKeyHandle& other) = delete;
-
-        // No Copy assignment operator
-        RegKeyHandle& operator=(const RegKeyHandle& other) = delete;
-
-        // Assignment operator
-        RegKeyHandle& operator=(HKEY hKey) {
-            if (_hKey != hKey) {
-                if (_hKey) {
-                    RegCloseKey(_hKey);
-                }
-                _hKey = hKey;
-            }
-            return *this;
-        }
-
-        HKEY get() const { return _hKey; }
-
-        bool isValid() const { return _hKey != NULL; }
-
-    private:
-        HKEY _hKey;
-    };
-
-    class ModuleHandle {
-
-    public:
-        explicit ModuleHandle(HMODULE handle) : handle_(handle) {}
-
-        ~ModuleHandle() {
-            if (handle_ != NULL) {
-                FreeLibrary(handle_);
-            }
-        }
-
-        // Prevent copying
-        ModuleHandle(const ModuleHandle&) = delete;
-        ModuleHandle& operator=(const ModuleHandle&) = delete;
-
-        // Allow moving
-        ModuleHandle(ModuleHandle&& other) noexcept : handle_(other.handle_) {
-            other.handle_ = NULL;
-        }
-
-        ModuleHandle& operator=(ModuleHandle&& other) noexcept {
-            if (this != &other) {
-                if (handle_ != NULL) {
-                    FreeLibrary(handle_);
-                }
-                handle_ = other.handle_;
-                other.handle_ = NULL;
-            }
-            return *this;
-        }
-
-        HMODULE get() const { return handle_; }
-
-        bool isValid() const { return handle_ != NULL; }
-
-    private:
-        HMODULE handle_;
-    };
+namespace DeviceManager {    
 
     struct enumContext {
         HDEVINFO hDevInfo;
@@ -145,8 +57,8 @@ namespace DeviceManager {
          * @param ClassGuid The GUID of the device class.
          * @param HwId The hardware ID of the device.
          */
-        DeviceManager(const char* ClassName, GUID ClassGuid, const char* HwId)
-            : className(ClassName), classGuid(ClassGuid), hwid(HwId) {
+        DeviceManager(const char* ClassName, GUID ClassGuid, const char* HwId, ISystemApi* api)
+            : className(ClassName), classGuid(ClassGuid), hwid(HwId), api_(api) {
         }
 
         virtual ~DeviceManager() {}
@@ -235,14 +147,6 @@ namespace DeviceManager {
         virtual void enumKey(HKEY regKey);
 
         /**
-         * @brief Gets the full path of a file.
-         *
-         * @param path The relative path.
-         * @return std::string The full path.
-         */
-        virtual std::string getFullPath(const std::string& path);
-
-        /**
          * @brief Finds hardware IDs of devices.
          *
          * @param result Vector to store the found hardware IDs.
@@ -256,22 +160,6 @@ namespace DeviceManager {
          * @return HDEVINFO The handle to the device information set.
          */
         virtual HDEVINFO getDevInfoSet(DWORD flags);
-
-        /**
-         * @brief Updates the driver using an INF file.
-         *
-         * @param infFile The path to the INF file.
-         * @return int 0 on success, non-zero on failure.
-         */
-        virtual int updateDriver(const std::string& infFile);
-
-        /**
-         * @brief Removes the driver using an INF file.
-         *
-         * @param infFile The path to the INF file.
-         * @return BOOL TRUE on success, FALSE on failure.
-         */
-        virtual BOOL removeDriver(const std::string& infFile);
 
         /**
          * @brief Gets the callback function for removing devices.
@@ -304,14 +192,6 @@ namespace DeviceManager {
          * @return HDEVINFO The handle to the new device information set.
          */
         virtual HDEVINFO createNewDeviceInfoSet(SP_DEVINFO_DATA* devInfoData);
-
-        /**
-         * @brief Gets the port name.
-         *
-         * @param context The context header containing device information.
-         * @return std::string The port name.
-         */
-        std::string getPortName(enumContext* context);
 
         /**
          * @brief Opens the hardware key for a device.
@@ -358,6 +238,8 @@ namespace DeviceManager {
             HDEVINFO hDevInfo,
             SP_DEVINFO_DATA devInfoData);
 
+        ISystemApi* api() { return api_; }
+
     private:
         GUID classGuid;              ///< The GUID of the device class.
         const std::string className; ///< The name of the device class.
@@ -366,6 +248,8 @@ namespace DeviceManager {
         // Prevent copying
         DeviceManager(const DeviceManager& other) = delete;
         DeviceManager& operator=(const DeviceManager& other) = delete;
+
+        ISystemApi* api_; ///< Pointer to the system API interface.
     };
 
     /**
@@ -382,13 +266,13 @@ namespace DeviceManager {
          * @param ClassGuid The GUID of the device class.
          * @param HwId The hardware ID of the device.
          */
-        SoftwareDeviceManager(const char* ClassName, GUID ClassGuid, const char* HwId)
-            : DeviceManager(ClassName, ClassGuid, HwId) {
+        SoftwareDeviceManager(const char* ClassName, GUID ClassGuid, const char* HwId, ISystemApi* api)
+            : DeviceManager(ClassName, ClassGuid, HwId, api) {
         }
 
         virtual ~SoftwareDeviceManager() {}
 
-        virtual int installDriver(const std::string& infFile, bool uninstall = false);
+        virtual int installDriver(const std::string& infFile, bool uninstall);
 
         /**
          * @brief Adds a device.
@@ -406,14 +290,6 @@ namespace DeviceManager {
         virtual int removeDevice(const std::string& device);
 
     protected:
-        /**
-         * @brief Installs a device.
-         *
-         * @param hDevInfo The handle to the device information set.
-         * @param DeviceInfoData The device information data.
-         * @return BOOL TRUE on success, FALSE on failure.
-         */
-        virtual BOOL installDevice(HDEVINFO hDevInfo, SP_DEVINFO_DATA* DeviceInfoData);
 
         /**
          * @brief Adds a new device.
