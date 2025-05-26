@@ -91,7 +91,7 @@ namespace DeviceManager {
          *
          * @return int 0 on success, non-zero on failure.
          */
-        virtual int addDevice() { return 0; }
+        virtual int addDevice() = 0;
 
         /**
          * @brief Removes a device.
@@ -99,7 +99,7 @@ namespace DeviceManager {
          * @param device The name of the device to remove.
          * @return int 0 on success, non-zero on failure.
          */
-        virtual int removeDevice(const std::string& device) { return 0; }
+        virtual int removeDevice(const std::string& device) = 0;
 
         /**
          * @brief Enables a device.

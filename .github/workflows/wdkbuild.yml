@@ -35,6 +35,21 @@ jobs:
         -configurations ${{env.BUILD_CONFIGURATION}} 
         -platforms ${{env.BUILD_PLATFORM}}
 
+    - name: Run Unit Tests
+      run: |
+        if (Test-Path ".\App\unitTest\x64\Debug\unitTest.exe") {
+          .\App\unitTest\x64\Debug\unitTest.exe --gtest_output=xml:unit_test_results.xml
+        } else {
+          Write-Host "unitTest.exe not found, skipping unit tests."
+        }
+
+    - name: Archive Unit Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{env.ARCHIVE_PREFIX}}-unittest-results
+        path: unit_test_results.xml
+
     - name: Archive logs
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
