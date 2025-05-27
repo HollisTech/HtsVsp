@@ -1,0 +1,3 @@
+<Project>
+	<Import Project="$(SolutionDir)\packages\gmock.1.11.0\build\native\gmock.targets" Condition="Exists('$(SolutionDir)\packages\gmock.1.11.0\build\native\gmock.targets')"/>
+</Project>

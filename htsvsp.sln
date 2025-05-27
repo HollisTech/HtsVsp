@@ -10,6 +10,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "App", "App", "{02EA681E-C7D
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "vspControl", "App\vspControl\vspControl.vcxproj", "{91BB54C2-1EC4-4255-87EB-3928EB64610D}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "unitTest", "App\unitTest\unitTest.vcxproj", "{17909B1A-FCF4-4B06-A07F-3CE6E95D56AF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM64 = Debug|ARM64
@@ -34,6 +36,14 @@ Global
 		{91BB54C2-1EC4-4255-87EB-3928EB64610D}.Release|ARM64.Build.0 = Release|x64
 		{91BB54C2-1EC4-4255-87EB-3928EB64610D}.Release|x64.ActiveCfg = Release|x64
 		{91BB54C2-1EC4-4255-87EB-3928EB64610D}.Release|x64.Build.0 = Release|x64
+		{17909B1A-FCF4-4B06-A07F-3CE6E95D56AF}.Debug|ARM64.ActiveCfg = Debug|x64
+		{17909B1A-FCF4-4B06-A07F-3CE6E95D56AF}.Debug|ARM64.Build.0 = Debug|x64
+		{17909B1A-FCF4-4B06-A07F-3CE6E95D56AF}.Debug|x64.ActiveCfg = Debug|x64
+		{17909B1A-FCF4-4B06-A07F-3CE6E95D56AF}.Debug|x64.Build.0 = Debug|x64
+		{17909B1A-FCF4-4B06-A07F-3CE6E95D56AF}.Release|ARM64.ActiveCfg = Release|x64
+		{17909B1A-FCF4-4B06-A07F-3CE6E95D56AF}.Release|ARM64.Build.0 = Release|x64
+		{17909B1A-FCF4-4B06-A07F-3CE6E95D56AF}.Release|x64.ActiveCfg = Release|x64
+		{17909B1A-FCF4-4B06-A07F-3CE6E95D56AF}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -41,5 +51,9 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{65A037CB-9245-442A-A791-5CFC34E97BF7} = {F7F21610-DDE7-4709-9C48-68A0ABD1FF65}
 		{91BB54C2-1EC4-4255-87EB-3928EB64610D} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+		{17909B1A-FCF4-4B06-A07F-3CE6E95D56AF} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {8EF5F3C3-3BD5-4DA6-9683-DBB2DC4F61BD}
 	EndGlobalSection
 EndGlobal
