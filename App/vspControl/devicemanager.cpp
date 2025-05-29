@@ -4,7 +4,16 @@
 
 extern Logger logger;
 
-namespace DeviceManager {    
+namespace DeviceManager { 
+
+    std::string str_toupper(std::string s)
+    {
+        auto s1 = s;
+        std::transform(s1.begin(), s1.end(), s1.begin(),
+            [](unsigned char c) { return std::toupper(c); }
+        );
+        return s1;
+    }
 
     LSTATUS DeviceManager::getRegValue(HKEY regKey, const std::string& valueName, std::vector<char>& valueData)
     {
@@ -294,7 +303,7 @@ namespace DeviceManager {
     {
         enumListContext listContext = { 0 };
         listContext.sep = "";
-        int retval = enumClassDevices(ListCallback(), &listContext);
+        int retval = enumClassDevices(listCallback(), &listContext);
         logger.flush(Logger::INFO_LVL);
         return retval;
     }
@@ -335,6 +344,9 @@ namespace DeviceManager {
                 currStringPtr += currStringLength + 1;
             }
             if (match && callback(context)) {
+                if (context->found) {
+                    retval = 0; // found at least one device
+                }
                 break;
             }
         }
@@ -360,6 +372,21 @@ namespace DeviceManager {
             }
         }
         return hDevInfoNew;
+    }
+
+    int DeviceManager::setClassDeviceState(enumContext* context, PSP_CLASSINSTALL_HEADER params, DWORD paramsSize)
+    {
+        if (!api()->SetupDiSetClassInstallParams(context->hDevInfo, &context->devInfoData, params, paramsSize)) {
+            logger << "SetupDiSetClassInstallParams failed error: " << std::hex << api()->getLastError() << std::endl;
+            logger.flush(Logger::ERROR_LVL);
+            return 1;
+        }
+        if (!api()->SetupDiCallClassInstaller(params->InstallFunction, context->hDevInfo, &context->devInfoData)) {
+            logger << "SetupDiCallClassInstaller failed error: " << std::hex << api()->getLastError() << std::endl;
+            logger.flush(Logger::ERROR_LVL);
+            return 1;
+        }
+        return 0;
     }
 
 
@@ -417,18 +444,44 @@ namespace DeviceManager {
 
     int SoftwareDeviceManager::removeDevice(const std::string& device)
     {
-        enumRemoveContext removeContext = { 0 };
+        enumDeviceContext removeContext = { 0 };
         removeContext.targetName = device;
-        int retval = enumClassDevices(RemoveCallback(), &removeContext);
-        return removeContext.found ? 1 : 0;
+        int retval = enumClassDevices(removeCallback(), &removeContext);
+        if (retval == 0) {
+            SP_REMOVEDEVICE_PARAMS rmdParams{ 0 };
+            rmdParams.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
+            rmdParams.ClassInstallHeader.InstallFunction = DIF_REMOVE;
+            rmdParams.Scope = DI_REMOVEDEVICE_GLOBAL;
+            rmdParams.HwProfile = 0;
+            if (setClassDeviceState((enumContext *)&removeContext, &rmdParams.ClassInstallHeader, sizeof(rmdParams)) != 0) {
+                logger << "Failed to set class device state for DIF_REMOVE." << std::endl;
+                logger.flush(Logger::ERROR_LVL);
+                return 1;
+            }
+            return 0;
+        }
+        return 1;
     }
 
-    std::string str_toupper(std::string s)
+    int SoftwareDeviceManager::enableDevice(const std::string& device) 
     {
-        auto s1 = s;
-        std::transform(s1.begin(), s1.end(), s1.begin(),
-            [](unsigned char c) { return std::toupper(c); }
-        );
-        return s1;
+        enumDeviceContext enableContext = { 0 };
+        enableContext.targetName = device;
+        int retval = enumClassDevices(enableCallback(), &enableContext);
+        if (retval == 0) {
+            SP_PROPCHANGE_PARAMS params;
+            params.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
+            params.ClassInstallHeader.InstallFunction = DIF_PROPERTYCHANGE;
+            params.StateChange = DICS_ENABLE;
+            params.Scope = DICS_FLAG_GLOBAL;
+            params.HwProfile = 0;
+            if (setClassDeviceState((enumContext *)&enableContext, &params.ClassInstallHeader, sizeof(params)) != 0) {
+                logger << "Failed to set class device state for DICS_ENABLE." << std::endl;
+                logger.flush(Logger::ERROR_LVL);
+                return 1;
+            }
+            return 0;
+        }
+        return 1;
     }
 }

@@ -25,16 +25,18 @@ public:
      *
      * @return CallbackFunc The callback function.
      */
-    virtual CallbackFunc RemoveCallback();
+    virtual CallbackFunc removeCallback();
 
     /**
      * @brief Gets the callback function for listing port devices.
      *
      * @return CallbackFunc The callback function.
      */
-    virtual CallbackFunc ListCallback();
+    virtual CallbackFunc listCallback();
 
-    int removePortCallback(enumContext * context);
+    virtual CallbackFunc enableCallback();
+
+    int devicePortCallback(enumContext * context);
 
     int listPortCallback(enumContext* context);
 

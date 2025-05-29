@@ -20,6 +20,7 @@ namespace DeviceManager {
         HDEVINFO hDevInfo;
         SP_DEVINFO_DATA devInfoData;
         DWORD Index;
+        bool found;
     };
 
     struct enumListContext : enumContext {
@@ -27,9 +28,8 @@ namespace DeviceManager {
 
     };
 
-    struct enumRemoveContext : enumContext {
+    struct enumDeviceContext : enumContext {
         std::string targetName;
-        bool found;
     };
 
     std::string str_toupper(std::string s);
@@ -39,8 +39,9 @@ namespace DeviceManager {
      *
      * @param context User-defined context passed to the callback function.
      * @return int Return 0 to continue enumeration, non-zero to stop.
+     * enumContext.found indicates that the target of the enumeration
+     * was processed successfully.
      */
-     //typedef int (*CallbackFunc)(_In_ PVOID context);
 #define CallbackFunc std::function<int(enumContext*)>
 
     /**
@@ -107,7 +108,7 @@ namespace DeviceManager {
          * @param device The name of the device to enable.
          * @return int 0 on success, non-zero on failure.
          */
-        virtual int enableDevice(const std::string& device) { return 0; }
+        virtual int enableDevice(const std::string& device) = 0;
 
         /**
          * @brief Disables a device.
@@ -166,14 +167,16 @@ namespace DeviceManager {
          *
          * @return CallbackFunc The callback function.
          */
-        virtual CallbackFunc RemoveCallback() = 0;
+        virtual CallbackFunc removeCallback() = 0;
 
         /**
          * @brief Gets the callback function for listing devices.
          *
          * @return CallbackFunc The callback function.
          */
-        virtual CallbackFunc ListCallback() = 0;
+        virtual CallbackFunc listCallback() = 0;
+
+        virtual CallbackFunc enableCallback() = 0;
 
         /**
          * @brief Enumerates class devices and calls a callback function for each device.
@@ -181,7 +184,8 @@ namespace DeviceManager {
          * @param callback The callback function.
          * @param context The user-defined context passed to the callback function.
          * @param flags The flags for SetupDiGetClassDevs.
-         * @return int 0 on success, non-zero on failure.
+         * @return int 0 on success nonzero on failure.
+         * 
          */
         virtual int enumClassDevices(CallbackFunc callback, enumContext * context, DWORD flags = DIGCF_PRESENT);
 
@@ -238,6 +242,8 @@ namespace DeviceManager {
             HDEVINFO hDevInfo,
             SP_DEVINFO_DATA devInfoData);
 
+        int setClassDeviceState(enumContext* context, PSP_CLASSINSTALL_HEADER params, DWORD paramsSize);
+
         ISystemApi* api() { return api_; }
 
     private:
@@ -288,6 +294,8 @@ namespace DeviceManager {
          * @return int 0 on success, non-zero on failure.
          */
         virtual int removeDevice(const std::string& device);
+
+        virtual int enableDevice(const std::string& device);
 
     protected:
 
