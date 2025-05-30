@@ -116,7 +116,7 @@ namespace DeviceManager {
          * @param device The name of the device to disable.
          * @return int 0 on success, non-zero on failure.
          */
-        virtual int disableDevice(const std::string& device) { return 0; }
+        virtual int disableDevice(const std::string& device) = 0;
 
     protected:
         /**
@@ -296,6 +296,8 @@ namespace DeviceManager {
         virtual int removeDevice(const std::string& device);
 
         virtual int enableDevice(const std::string& device);
+
+        virtual int disableDevice(const std::string& device);
 
     protected:
 

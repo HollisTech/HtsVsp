@@ -301,9 +301,16 @@ namespace DeviceManager {
 
     int DeviceManager::listDevices()
     {
+        int retval = 1;
         enumListContext listContext = { 0 };
-        listContext.sep = "";
-        int retval = enumClassDevices(listCallback(), &listContext);
+        listContext.sep = ""; HDevInfoHandle hDevInfo(getDevInfoSet(DIGCF_PRESENT), api());
+        if (!hDevInfo.isValid()) {
+            logger << "Failed to get class devices. Error: " << api()->getLastError() << std::endl;
+            logger.flush(Logger::ERROR_LVL);
+            return retval;
+        }
+        listContext.hDevInfo = hDevInfo.get();
+        retval = enumClassDevices(listCallback(), &listContext);
         logger.flush(Logger::INFO_LVL);
         return retval;
     }
@@ -315,14 +322,6 @@ namespace DeviceManager {
     {
         int retval = 1;
         HKEY regKey = (HKEY)INVALID_HANDLE_VALUE;
-        HDevInfoHandle hDevInfo(getDevInfoSet(flags), api());
-        if (!hDevInfo.isValid()) {
-            logger << "Failed to get class devices. Error: " << api()->getLastError() << std::endl;
-            logger.flush(Logger::ERROR_LVL);
-            return retval;
-        }
-        context->hDevInfo = hDevInfo.get();
-        context->devInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
         for (DWORD i = 0; api()->SetupDiEnumDeviceInfo(context->hDevInfo, i, &context->devInfoData); ++i) {
             bool match = false;
             std::vector<char> buffer = getDeviceHwIds(context->hDevInfo, context->devInfoData);
@@ -444,9 +443,17 @@ namespace DeviceManager {
 
     int SoftwareDeviceManager::removeDevice(const std::string& device)
     {
+        int retval = 1;
         enumDeviceContext removeContext = { 0 };
         removeContext.targetName = device;
-        int retval = enumClassDevices(removeCallback(), &removeContext);
+        HDevInfoHandle hDevInfo(getDevInfoSet(DIGCF_PRESENT), api());
+        if (!hDevInfo.isValid()) {
+            logger << "Failed to get class devices. Error: " << api()->getLastError() << std::endl;
+            logger.flush(Logger::ERROR_LVL);
+            return retval;
+        }
+        removeContext.hDevInfo = hDevInfo.get();
+        retval = enumClassDevices(removeCallback(), &removeContext);
         if (retval == 0) {
             SP_REMOVEDEVICE_PARAMS rmdParams{ 0 };
             rmdParams.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
@@ -465,9 +472,18 @@ namespace DeviceManager {
 
     int SoftwareDeviceManager::enableDevice(const std::string& device) 
     {
+        int retval = 1;
         enumDeviceContext enableContext = { 0 };
         enableContext.targetName = device;
-        int retval = enumClassDevices(enableCallback(), &enableContext);
+        HDevInfoHandle hDevInfo(getDevInfoSet(DIGCF_PRESENT), api());
+        if (!hDevInfo.isValid()) {
+            logger << "Failed to get class devices. Error: " << api()->getLastError() << std::endl;
+            logger.flush(Logger::ERROR_LVL);
+            return retval;
+        }
+        enableContext.hDevInfo = hDevInfo.get();
+        enableContext.devInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
+        retval = enumClassDevices(enableCallback(), &enableContext);
         if (retval == 0) {
             SP_PROPCHANGE_PARAMS params;
             params.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
@@ -477,6 +493,37 @@ namespace DeviceManager {
             params.HwProfile = 0;
             if (setClassDeviceState((enumContext *)&enableContext, &params.ClassInstallHeader, sizeof(params)) != 0) {
                 logger << "Failed to set class device state for DICS_ENABLE." << std::endl;
+                logger.flush(Logger::ERROR_LVL);
+                return 1;
+            }
+            return 0;
+        }
+        return 1;
+    }
+
+    int SoftwareDeviceManager::disableDevice(const std::string& device)
+    {
+        int retval = 1;
+        enumDeviceContext disableContext = { 0 };
+        disableContext.targetName = device;
+        HDevInfoHandle hDevInfo(getDevInfoSet(DIGCF_PRESENT), api());
+        if (!hDevInfo.isValid()) {
+            logger << "Failed to get class devices. Error: " << api()->getLastError() << std::endl;
+            logger.flush(Logger::ERROR_LVL);
+            return retval;
+        }
+        disableContext.hDevInfo = hDevInfo.get();
+        disableContext.devInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
+        retval = enumClassDevices(enableCallback(), &disableContext);
+        if (retval == 0) {
+            SP_PROPCHANGE_PARAMS params;
+            params.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
+            params.ClassInstallHeader.InstallFunction = DIF_PROPERTYCHANGE;
+            params.StateChange = DICS_DISABLE;
+            params.Scope = DICS_FLAG_GLOBAL;
+            params.HwProfile = 0;
+            if (setClassDeviceState((enumContext*)&disableContext, &params.ClassInstallHeader, sizeof(params)) != 0) {
+                logger << "Failed to set class device state for DICS_DISABLE." << std::endl;
                 logger.flush(Logger::ERROR_LVL);
                 return 1;
             }

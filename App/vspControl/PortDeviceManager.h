@@ -36,6 +36,8 @@ public:
 
     virtual CallbackFunc enableCallback();
 
+    virtual CallbackFunc disableCallback();
+
     int devicePortCallback(enumContext * context);
 
     int listPortCallback(enumContext* context);
