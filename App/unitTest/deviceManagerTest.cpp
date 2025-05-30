@@ -55,6 +55,11 @@ public:
         CallbackFunc f = std::bind(&TestDeviceManager::deviceTestCallback, this, std::placeholders::_1);
         return  f;
     }
+    CallbackFunc disableCallback()
+    {
+        CallbackFunc f = std::bind(&TestDeviceManager::deviceTestCallback, this, std::placeholders::_1);
+        return  f;
+    }
 };
 
 class DeviceManagerUnitTest : public ::testing::Test {
@@ -151,10 +156,10 @@ TEST_F(DeviceManagerUnitTest, RemoveDeviceReturnsZero) {
         ));
 
     EXPECT_CALL(mockApi, SetupDiSetClassInstallParams)
-        .WillRepeatedly(Return(TRUE));
+        .WillOnce(Return(TRUE));
 
     EXPECT_CALL(mockApi, SetupDiCallClassInstaller)
-        .WillRepeatedly(Return(TRUE));
+        .WillOnce(Return(TRUE));
 
     EXPECT_EQ(manager->removeDevice(testhwid), 0);
 }
@@ -191,15 +196,51 @@ TEST_F(DeviceManagerUnitTest, EnableDeviceReturnsZero) {
         ));
 
     EXPECT_CALL(mockApi, SetupDiSetClassInstallParams)
-        .WillRepeatedly(Return(TRUE));
+        .WillOnce(Return(TRUE));
 
     EXPECT_CALL(mockApi, SetupDiCallClassInstaller)
-        .WillRepeatedly(Return(TRUE));
+        .WillOnce(Return(TRUE));
 
     EXPECT_EQ(manager->enableDevice(testhwid), 0);
 }
 
 TEST_F(DeviceManagerUnitTest, DisableDeviceReturnsZero) {
+
+    HDEVINFO dummyDevInfo = (HDEVINFO)0x1234;
+
+    // The multi-string to return
+    std::vector<std::string> hwids = { "HWID1", testhwid };
+    std::vector<char> multistring = makeMultiString(hwids);
+    DWORD requiredSize = static_cast<DWORD>(multistring.size());
+
+    EXPECT_CALL(mockApi, SetupDiGetClassDevs(_, _))
+        .WillRepeatedly(Return(dummyDevInfo));
+
+    EXPECT_CALL(mockApi, SetupDiEnumDeviceInfo(_, _, _))
+        .WillOnce(Return(TRUE))
+        .WillRepeatedly(Return(FALSE));
+
+    EXPECT_CALL(mockApi, getLastError)
+        .WillOnce(Return(ERROR_INSUFFICIENT_BUFFER))
+        .WillRepeatedly(Return(ERROR_SUCCESS));
+
+    EXPECT_CALL(mockApi, SetupDiGetDeviceRegistryProperty(_, _, SPDRP_HARDWAREID, _, _, 0, _))
+        .WillOnce(DoAll(
+            SetArgPointee<6>(requiredSize),
+            Return(FALSE)));
+
+    EXPECT_CALL(mockApi, SetupDiGetDeviceRegistryProperty(_, _, SPDRP_HARDWAREID, _, _, requiredSize, _))
+        .WillOnce(DoAll(
+            SetArrayArgument<4>(multistring.begin(), multistring.end()), // fill PropertyBuffer
+            Return(TRUE)
+        ));
+
+    EXPECT_CALL(mockApi, SetupDiSetClassInstallParams)
+        .WillOnce(Return(TRUE));
+
+    EXPECT_CALL(mockApi, SetupDiCallClassInstaller)
+        .WillOnce(Return(TRUE));
+
     EXPECT_EQ(manager->disableDevice(testhwid), 0);
 }
 

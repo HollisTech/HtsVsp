@@ -76,6 +76,12 @@ CallbackFunc PortDeviceManager::enableCallback()
     return  f;
 }
 
+CallbackFunc PortDeviceManager::disableCallback()
+{
+    CallbackFunc f = std::bind(&PortDeviceManager::devicePortCallback, this, std::placeholders::_1);
+    return  f;
+}
+
 CallbackFunc PortDeviceManager::removeCallback()
 {
     CallbackFunc f = std::bind(&PortDeviceManager::devicePortCallback, this, std::placeholders::_1);
