@@ -303,7 +303,8 @@ namespace DeviceManager {
     {
         int retval = 1;
         enumListContext listContext = { 0 };
-        listContext.sep = ""; HDevInfoHandle hDevInfo(getDevInfoSet(DIGCF_PRESENT), api());
+        listContext.sep = ""; 
+        HDevInfoHandle hDevInfo(getDevInfoSet(DIGCF_PRESENT), api());
         if (!hDevInfo.isValid()) {
             logger << "Failed to get class devices. Error: " << api()->getLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
