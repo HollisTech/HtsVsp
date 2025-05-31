@@ -61,6 +61,8 @@ int main(int argc, CHAR* argv[])
             ("w,waitUnits", "set the 500ms wait units to n.", cxxopts::value<ULONG>())
             ("addDevice", "add a new htsvsp device")
             ("removeDevice", "remove htsvsp device specified by com port", cxxopts::value<std::string>())
+            ("enableDevice", "enable htsvsp device specified by com port", cxxopts::value<std::string>())
+            ("disableDevice", "disable htsvsp device specified by com port", cxxopts::value<std::string>())
             ("listDevices", "list all htsvsp device com ports")
             ("stop", "stop network operations.")
             ("selectPort", "select which htsvsp port to use. Default is first found.", cxxopts::value<ULONG>())
@@ -101,6 +103,24 @@ int main(int argc, CHAR* argv[])
             std::string comport = str_toupper(optResult["removeDevice"].as<std::string>());
             if (portDevice.removeDevice(comport) == 0) {
                 logger << "device " << comport << " removed\n";
+                logger.flush(Logger::INFO_LVL);
+                return 0;
+            }
+            return 1;
+        }
+        if (optResult.count("enableDevice")) {
+            std::string comport = str_toupper(optResult["enableDevice"].as<std::string>());
+            if (portDevice.enableDevice(comport) == 0) {
+                logger << "device " << comport << " enabled\n";
+                logger.flush(Logger::INFO_LVL);
+                return 0;
+            }
+            return 1;
+        }
+        if (optResult.count("disableDevice")) {
+            std::string comport = str_toupper(optResult["disableDevice"].as<std::string>());
+            if (portDevice.disableDevice(comport) == 0) {
+                logger << "device " << comport << " disabled\n";
                 logger.flush(Logger::INFO_LVL);
                 return 0;
             }

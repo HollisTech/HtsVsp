@@ -24,28 +24,12 @@ std::string PortDeviceManager::getPortName(enumContext* context)
     return portName;
 }
 
-
-int PortDeviceManager::removePortCallback(enumContext* context)
+int PortDeviceManager::devicePortCallback(enumContext* context)
 {
-    enumRemoveContext* ctx = (enumRemoveContext*)context;
+    enumDeviceContext* ctx = (enumDeviceContext*)context;
     std::string portName = str_toupper(getPortName(ctx));
     if (portName == ctx->targetName) {
         // found the port to remove
-        SP_REMOVEDEVICE_PARAMS rmdParams{ 0 };
-        rmdParams.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
-        rmdParams.ClassInstallHeader.InstallFunction = DIF_REMOVE;
-        rmdParams.Scope = DI_REMOVEDEVICE_GLOBAL;
-        rmdParams.HwProfile = 0;
-        if (!api()->SetupDiSetClassInstallParams(ctx->hDevInfo, &ctx->devInfoData, &rmdParams.ClassInstallHeader, sizeof(rmdParams))) {
-            logger << "Failed to set class install DIF_REMOVE params. Error: " << std::hex << api()->getLastError() << std::endl;
-            logger.flush(Logger::ERROR_LVL);
-            return 1;
-        }
-        if (!api()->SetupDiCallClassInstaller(DIF_REMOVE, ctx->hDevInfo, &ctx->devInfoData)) {
-            logger << "Failed to call class installer for DIF_REMOVE. Error: " << std::hex << api()->getLastError() << std::endl;
-            logger.flush(Logger::ERROR_LVL);
-            return 1;
-        }
         ctx->found = true;
         // terminate the enumeration
         return 1;
@@ -85,13 +69,26 @@ int PortDeviceManager::listPortCallback(enumContext* context)
     return 0;
 }
 
-CallbackFunc PortDeviceManager::RemoveCallback()
+
+CallbackFunc PortDeviceManager::enableCallback()
 {
-    CallbackFunc f = std::bind(&PortDeviceManager::removePortCallback, this, std::placeholders::_1);
+    CallbackFunc f = std::bind(&PortDeviceManager::devicePortCallback, this, std::placeholders::_1);
     return  f;
 }
 
-CallbackFunc PortDeviceManager::ListCallback()
+CallbackFunc PortDeviceManager::disableCallback()
+{
+    CallbackFunc f = std::bind(&PortDeviceManager::devicePortCallback, this, std::placeholders::_1);
+    return  f;
+}
+
+CallbackFunc PortDeviceManager::removeCallback()
+{
+    CallbackFunc f = std::bind(&PortDeviceManager::devicePortCallback, this, std::placeholders::_1);
+    return  f;
+}
+
+CallbackFunc PortDeviceManager::listCallback()
 {
     CallbackFunc f = std::bind(&PortDeviceManager::listPortCallback, this, std::placeholders::_1);
     return f;
