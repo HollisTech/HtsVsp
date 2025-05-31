@@ -178,6 +178,8 @@ namespace DeviceManager {
 
         virtual CallbackFunc enableCallback() = 0;
 
+        virtual CallbackFunc disableCallback() = 0;
+
         /**
          * @brief Enumerates class devices and calls a callback function for each device.
          *

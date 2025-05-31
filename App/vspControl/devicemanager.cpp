@@ -303,7 +303,8 @@ namespace DeviceManager {
     {
         int retval = 1;
         enumListContext listContext = { 0 };
-        listContext.sep = ""; HDevInfoHandle hDevInfo(getDevInfoSet(DIGCF_PRESENT), api());
+        listContext.sep = ""; 
+        HDevInfoHandle hDevInfo(getDevInfoSet(DIGCF_PRESENT), api());
         if (!hDevInfo.isValid()) {
             logger << "Failed to get class devices. Error: " << api()->getLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
@@ -514,7 +515,7 @@ namespace DeviceManager {
         }
         disableContext.hDevInfo = hDevInfo.get();
         disableContext.devInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
-        retval = enumClassDevices(enableCallback(), &disableContext);
+        retval = enumClassDevices(disableCallback(), &disableContext);
         if (retval == 0) {
             SP_PROPCHANGE_PARAMS params;
             params.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);

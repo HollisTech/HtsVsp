@@ -55,6 +55,11 @@ public:
         CallbackFunc f = std::bind(&TestDeviceManager::deviceTestCallback, this, std::placeholders::_1);
         return  f;
     }
+    CallbackFunc disableCallback()
+    {
+        CallbackFunc f = std::bind(&TestDeviceManager::deviceTestCallback, this, std::placeholders::_1);
+        return  f;
+    }
 };
 
 class DeviceManagerUnitTest : public ::testing::Test {
