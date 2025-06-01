@@ -36,8 +36,9 @@ public:
         }
         return 0;
     }
-    int listTestCallback(enumContext* )
+    int listTestCallback(enumContext* ctx)
     { 
+        ctx->found = true;
         return 0;
     }
     CallbackFunc listCallback()
@@ -242,6 +243,32 @@ TEST_F(DeviceManagerUnitTest, DisableDeviceReturnsZero) {
         .WillOnce(Return(TRUE));
 
     EXPECT_EQ(manager->disableDevice(testhwid), 0);
+}
+
+TEST_F(DeviceManagerUnitTest, ListDevicesReturnsZero) {
+    HDEVINFO dummyDevInfo = (HDEVINFO)0x1234;
+    // The multi-string to return
+    std::vector<std::string> hwids = { "HWID1", testhwid };
+    std::vector<char> multistring = makeMultiString(hwids);
+    DWORD requiredSize = static_cast<DWORD>(multistring.size());
+    EXPECT_CALL(mockApi, SetupDiGetClassDevs(_, _))
+        .WillRepeatedly(Return(dummyDevInfo));
+    EXPECT_CALL(mockApi, SetupDiEnumDeviceInfo(_, _, _))
+        .WillOnce(Return(TRUE))
+        .WillRepeatedly(Return(FALSE));
+    EXPECT_CALL(mockApi, getLastError)
+        .WillOnce(Return(ERROR_INSUFFICIENT_BUFFER))
+        .WillRepeatedly(Return(ERROR_SUCCESS));
+    EXPECT_CALL(mockApi, SetupDiGetDeviceRegistryProperty(_, _, SPDRP_HARDWAREID, _, _, 0, _))
+        .WillOnce(DoAll(
+            SetArgPointee<6>(requiredSize),
+            Return(FALSE)));
+    EXPECT_CALL(mockApi, SetupDiGetDeviceRegistryProperty(_, _, SPDRP_HARDWAREID, _, _, requiredSize, _))
+        .WillOnce(DoAll(
+            SetArrayArgument<4>(multistring.begin(), multistring.end()), // fill PropertyBuffer
+            Return(TRUE)
+        ));
+    EXPECT_EQ(manager->listDevices(), 0);
 }
 
 

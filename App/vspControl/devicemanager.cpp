@@ -344,11 +344,11 @@ namespace DeviceManager {
                 currStringPtr += currStringLength + 1;
             }
             if (match && callback(context)) {
-                if (context->found) {
-                    retval = 0; // found at least one device
-                }
                 break;
             }
+        }
+        if (context->found) {
+            retval = 0; // found at least one device
         }
         return retval;
     }
