@@ -271,6 +271,83 @@ TEST_F(DeviceManagerUnitTest, ListDevicesReturnsZero) {
     EXPECT_EQ(manager->listDevices(), 0);
 }
 
+TEST_F(DeviceManagerUnitTest, installDriverReturnsZero) {
+
+    EXPECT_CALL(mockApi, getFullPath)
+        .WillOnce(Return("test.inf"));
+
+    EXPECT_CALL(mockApi, SetupDiCreateDeviceInfoList(_, _))
+        .WillOnce(Return((HDEVINFO)12345));
+
+    EXPECT_CALL(mockApi, SetupDiCreateDeviceInfo(_, _, _, _, _, _, _))
+        .WillOnce(Return(TRUE));
+
+    EXPECT_CALL(mockApi, SetupDiSetDeviceRegistryProperty(_, _, _, _, _))
+        .WillOnce(Return(TRUE));
+    
+    EXPECT_CALL(mockApi, SetupDiCallClassInstaller(_, _, _))
+        .WillOnce(Return(TRUE));
+
+    EXPECT_CALL(mockApi, updateDriver)
+        .WillOnce(Return(TRUE));
+
+    EXPECT_CALL(mockApi, SetupDiOpenDevRegKey)
+        .WillRepeatedly(Return((HKEY)12345));
+    // for now just stub out the registry enumeration (TBD: enum each supported type.)    DWORD dataSize = 0;
+    EXPECT_CALL(mockApi, RegEnumValue)
+        .WillRepeatedly(Return(ERROR_NO_MORE_ITEMS));
+
+    EXPECT_EQ(manager->installDriver("test.inf", false), 0);
+}
+
+TEST_F(DeviceManagerUnitTest, UninstallDriverReturnsTrue) {
+    HDEVINFO dummyDevInfo = (HDEVINFO)0x1234;
+    SP_DEVINFO_DATA dummyDevInfoData = {};
+    dummyDevInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
+    std::vector<std::string> hwids = { "HWID1", testhwid };
+    std::vector<char> multistring = makeMultiString(hwids);
+    DWORD requiredSize = static_cast<DWORD>(multistring.size());
+    std::string infPath = "oem1.inf";
+    DWORD infSize = static_cast<DWORD>(infPath.size() + 1);
+
+    // Setup mocks for device enumeration and matching
+    EXPECT_CALL(mockApi, SetupDiGetClassDevs(_, _))
+        .WillOnce(Return(dummyDevInfo));
+
+    EXPECT_CALL(mockApi, SetupDiEnumDeviceInfo(_, _, _))
+        .WillOnce(DoAll(SetArgPointee<2>(dummyDevInfoData), Return(TRUE)))
+        .WillRepeatedly(Return(FALSE));
+
+    EXPECT_CALL(mockApi, getLastError)
+        .WillOnce(Return(ERROR_INSUFFICIENT_BUFFER))
+        .WillRepeatedly(Return(ERROR_SUCCESS));
+
+    EXPECT_CALL(mockApi, SetupDiGetDeviceRegistryProperty(_, _, SPDRP_HARDWAREID, _, _, 0, _))
+        .WillOnce(DoAll(SetArgPointee<6>(requiredSize), Return(FALSE)));
+
+    EXPECT_CALL(mockApi, SetupDiGetDeviceRegistryProperty(_, _, SPDRP_HARDWAREID, _, _, requiredSize, _))
+        .WillOnce(DoAll(SetArrayArgument<4>(multistring.begin(), multistring.end()), Return(TRUE)));
+
+    // Setup mocks for registry key and inf path
+    EXPECT_CALL(mockApi, SetupDiOpenDevRegKey(_, _, _, _, _, _))
+        .WillOnce(Return((HKEY)12345));
+
+    EXPECT_CALL(mockApi, RegQueryValueEx((HKEY)12345, _, _, _, _))
+        .WillOnce(DoAll(SetArgPointee<4>(infSize), Return(ERROR_SUCCESS)))
+        .WillOnce(Return(ERROR_SUCCESS));
+
+    // Setup mocks for device removal
+    EXPECT_CALL(mockApi, SetupDiSetClassInstallParams(_, _, _, _))
+        .WillOnce(Return(TRUE));
+
+    EXPECT_CALL(mockApi, SetupDiCallClassInstaller(DIF_REMOVE, _, _))
+        .WillOnce(Return(TRUE));
+
+    EXPECT_CALL(mockApi, SetupUninstallOEMInf(_, SUOI_FORCEDELETE))
+        .WillOnce(Return(TRUE));
+
+    EXPECT_TRUE(manager->uninstallDriver("test.inf"));
+}
 
 int main(int argc, char** argv) {
     testing::InitGoogleTest(&argc, argv);

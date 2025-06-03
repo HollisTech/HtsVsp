@@ -144,6 +144,7 @@ namespace DeviceManager {
     {
         DWORD flags = DIGCF_PRESENT;
         HDevInfoHandle hDevInfo(getDevInfoSet(flags), api());
+        std::list < std::string> oemfiles;
 
         if (!hDevInfo.isValid()) {
             logger << "Failed to get class devices. Error: " << std::hex << api()->getLastError() << std::endl;
@@ -186,6 +187,7 @@ namespace DeviceManager {
                         logger << "Failed to get inf path. Error: " << std::hex << api()->getLastError() << "\n";
                         logger.flush(Logger::ERROR_LVL);
                     }
+                    oemfiles.push_back(std::string(infBuffer.data()));
                 }
                 else {
                     logger << "Failed to get infpath size. Error: " << std::hex << api()->getLastError() << "\n";
@@ -209,18 +211,18 @@ namespace DeviceManager {
                 logger.flush(Logger::ERROR_LVL);
                 return FALSE;
             }
-            if (!infBuffer.empty()) {
-                std::string infPath(infBuffer.data());
-                logger << "Removing driver package for: " << infPath << "\n";
-                logger.flush(Logger::INFO_LVL);
-                // remove the driver
-                if (!api()->SetupUninstallOEMInf(infPath.c_str(), SUOI_FORCEDELETE)) {
-                    logger << "Failed to uninstall driver. Error: " << std::hex << api()->getLastError() << std::endl;
-                    logger.flush(Logger::ERROR_LVL);
-                    return FALSE;
-                }
+        }
+        oemfiles.sort();
+        oemfiles.unique(); // remove duplicates
+        for (std::string& infPath : oemfiles) {
+            logger << "Removing driver package for: " << infPath << "\n";
+            logger.flush(Logger::INFO_LVL);
+            // remove the driver
+            if (!api()->SetupUninstallOEMInf(infPath.c_str(), SUOI_FORCEDELETE)) {
+                logger << "Failed to uninstall driver. Error: " << std::hex << api()->getLastError() << std::endl;
+                logger.flush(Logger::ERROR_LVL);
+                return FALSE;
             }
-
         }
         return TRUE;
     }
@@ -323,6 +325,7 @@ namespace DeviceManager {
     {
         int retval = 1;
         HKEY regKey = (HKEY)INVALID_HANDLE_VALUE;
+        context->devInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
         for (DWORD i = 0; api()->SetupDiEnumDeviceInfo(context->hDevInfo, i, &context->devInfoData); ++i) {
             bool match = false;
             std::vector<char> buffer = getDeviceHwIds(context->hDevInfo, context->devInfoData);
@@ -483,7 +486,6 @@ namespace DeviceManager {
             return retval;
         }
         enableContext.hDevInfo = hDevInfo.get();
-        enableContext.devInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
         retval = enumClassDevices(enableCallback(), &enableContext);
         if (retval == 0) {
             SP_PROPCHANGE_PARAMS params;
@@ -514,7 +516,6 @@ namespace DeviceManager {
             return retval;
         }
         disableContext.hDevInfo = hDevInfo.get();
-        disableContext.devInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
         retval = enumClassDevices(disableCallback(), &disableContext);
         if (retval == 0) {
             SP_PROPCHANGE_PARAMS params;
