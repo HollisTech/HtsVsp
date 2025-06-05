@@ -63,11 +63,29 @@ public:
     }
 };
 
+std::vector<char> makeMultiString(const std::vector<std::string>& strings) {
+    std::vector<char> buffer;
+    for (const auto& s : strings) {
+        buffer.insert(buffer.end(), s.begin(), s.end());
+        buffer.push_back('\0');
+    }
+    buffer.push_back('\0'); // double NUL
+    return buffer;
+}
+
 class DeviceManagerUnitTest : public ::testing::Test {
 protected:
+
     GUID guid = { 0x12345678, 0x1234, 0x5678, {0,1,2,3,4,5,6,7} };
     NiceMock<MockSystemApi> mockApi;
     std::unique_ptr<TestDeviceManager> manager;
+
+    HDEVINFO dummyDevInfo = (HDEVINFO)0x1234;
+
+    // The multi-string to return
+    std::vector<std::string> hwids = { "HWID1", testhwid };
+    std::vector<char> multistring = makeMultiString(hwids);
+    DWORD requiredSize = static_cast<DWORD>(multistring.size());
 
     void SetUp() override {
         manager.reset(new TestDeviceManager("TestClass", guid, testhwid, &mockApi));
@@ -115,24 +133,8 @@ TEST_F(DeviceManagerUnitTest, AddDeviceErrorPaths) {
         EXPECT_NE(manager->addDevice(), 0);
     }
 }
-
-std::vector<char> makeMultiString(const std::vector<std::string>& strings) {
-    std::vector<char> buffer;
-    for (const auto& s : strings) {
-        buffer.insert(buffer.end(), s.begin(), s.end());
-        buffer.push_back('\0');
-    }
-    buffer.push_back('\0'); // double NUL
-    return buffer;
-}
 TEST_F(DeviceManagerUnitTest, RemoveDeviceReturnsZero) {
 
-    HDEVINFO dummyDevInfo = (HDEVINFO)0x1234;
-
-    // The multi-string to return
-    std::vector<std::string> hwids = { "HWID1", testhwid };
-    std::vector<char> multistring = makeMultiString(hwids);
-    DWORD requiredSize = static_cast<DWORD>(multistring.size());
 
     EXPECT_CALL(mockApi, SetupDiGetClassDevs(_, _))
         .WillRepeatedly(Return(dummyDevInfo));
@@ -188,12 +190,6 @@ TEST_F(DeviceManagerUnitTest, RemoveDeviceEmptySetupDiEnumDeviceInfoError) {
 
 TEST_F(DeviceManagerUnitTest, RemoveDeviceSetupDiGetDeviceRegistryPropertyWrongError) {
 
-    HDEVINFO dummyDevInfo = (HDEVINFO)0x1234;
-
-    // The multi-string to return
-    std::vector<std::string> hwids = { "HWID1", testhwid };
-    std::vector<char> multistring = makeMultiString(hwids);
-    DWORD requiredSize = static_cast<DWORD>(multistring.size());
 
     EXPECT_CALL(mockApi, SetupDiGetClassDevs(_, _))
         .WillRepeatedly(Return(dummyDevInfo));
@@ -215,12 +211,6 @@ TEST_F(DeviceManagerUnitTest, RemoveDeviceSetupDiGetDeviceRegistryPropertyWrongE
 
 TEST_F(DeviceManagerUnitTest, RemoveDeviceSetupDiGetDeviceRegistryPropertyError) {
 
-    HDEVINFO dummyDevInfo = (HDEVINFO)0x1234;
-
-    // The multi-string to return
-    std::vector<std::string> hwids = { "HWID1", testhwid };
-    std::vector<char> multistring = makeMultiString(hwids);
-    DWORD requiredSize = static_cast<DWORD>(multistring.size());
 
     EXPECT_CALL(mockApi, SetupDiGetClassDevs(_, _))
         .WillRepeatedly(Return(dummyDevInfo));
@@ -251,12 +241,6 @@ TEST_F(DeviceManagerUnitTest, RemoveDeviceSetupDiGetDeviceRegistryPropertyError)
 
 TEST_F(DeviceManagerUnitTest, RemoveDeviceSetupDiSetClassInstallParamsError){
 
-    HDEVINFO dummyDevInfo = (HDEVINFO)0x1234;
-
-    // The multi-string to return
-    std::vector<std::string> hwids = { "HWID1", testhwid };
-    std::vector<char> multistring = makeMultiString(hwids);
-    DWORD requiredSize = static_cast<DWORD>(multistring.size());
 
     EXPECT_CALL(mockApi, SetupDiGetClassDevs(_, _))
         .WillRepeatedly(Return(dummyDevInfo));
@@ -287,12 +271,6 @@ TEST_F(DeviceManagerUnitTest, RemoveDeviceSetupDiSetClassInstallParamsError){
 }
 TEST_F(DeviceManagerUnitTest, RemoveDeviceSetupDiCallClassInstallerError) {
 
-    HDEVINFO dummyDevInfo = (HDEVINFO)0x1234;
-
-    // The multi-string to return
-    std::vector<std::string> hwids = { "HWID1", testhwid };
-    std::vector<char> multistring = makeMultiString(hwids);
-    DWORD requiredSize = static_cast<DWORD>(multistring.size());
 
     EXPECT_CALL(mockApi, SetupDiGetClassDevs(_, _))
         .WillRepeatedly(Return(dummyDevInfo));
@@ -327,13 +305,6 @@ TEST_F(DeviceManagerUnitTest, RemoveDeviceSetupDiCallClassInstallerError) {
 
 TEST_F(DeviceManagerUnitTest, EnableDeviceReturnsZero) {
 
-    HDEVINFO dummyDevInfo = (HDEVINFO)0x1234;
-
-    // The multi-string to return
-    std::vector<std::string> hwids = { "HWID1", testhwid };
-    std::vector<char> multistring = makeMultiString(hwids);
-    DWORD requiredSize = static_cast<DWORD>(multistring.size());
-
     EXPECT_CALL(mockApi, SetupDiGetClassDevs(_, _))
         .WillRepeatedly(Return(dummyDevInfo));
 
@@ -365,14 +336,57 @@ TEST_F(DeviceManagerUnitTest, EnableDeviceReturnsZero) {
     EXPECT_EQ(manager->enableDevice(testhwid), 0);
 }
 
+TEST_F(DeviceManagerUnitTest, EnableDeviceErrorSetupDiGetClassDevs) {
+
+    EXPECT_CALL(mockApi, SetupDiGetClassDevs(_, _))
+        .WillOnce(Return(INVALID_HANDLE_VALUE));
+
+    EXPECT_EQ(manager->enableDevice(testhwid), 1);
+}
+
+TEST_F(DeviceManagerUnitTest, EnableDeviceSetupDiEnumDeviceInfoError) {
+
+    EXPECT_CALL(mockApi, SetupDiGetClassDevs(_, _))
+        .WillRepeatedly(Return(dummyDevInfo));
+
+    EXPECT_CALL(mockApi, SetupDiEnumDeviceInfo(_, _, _))
+        .WillOnce(Return(FALSE));
+
+    EXPECT_EQ(manager->enableDevice(testhwid), 1);
+}
+
+TEST_F(DeviceManagerUnitTest, EnableDeviceSetupDiGetDeviceRegistryPropertyError) {
+
+
+    EXPECT_CALL(mockApi, SetupDiGetClassDevs(_, _))
+        .WillRepeatedly(Return(dummyDevInfo));
+
+    EXPECT_CALL(mockApi, SetupDiEnumDeviceInfo(_, _, _))
+        .WillOnce(Return(TRUE))
+        .WillRepeatedly(Return(FALSE));
+
+    EXPECT_CALL(mockApi, getLastError)
+        .WillOnce(Return(ERROR_INSUFFICIENT_BUFFER))
+        .WillOnce(Return(ERROR_SUCCESS))
+        .WillRepeatedly(Return(ERROR_INVALID_DATA));
+
+
+    EXPECT_CALL(mockApi, SetupDiGetDeviceRegistryProperty(_, _, SPDRP_HARDWAREID, _, _, 0, _))
+        .WillOnce(DoAll(
+            SetArgPointee<6>(requiredSize),
+            Return(FALSE)));
+
+    EXPECT_CALL(mockApi, SetupDiGetDeviceRegistryProperty(_, _, SPDRP_HARDWAREID, _, _, requiredSize, _))
+        .WillOnce(DoAll(
+            SetArrayArgument<4>(multistring.begin(), multistring.end()), // fill PropertyBuffer
+            Return(FALSE)
+        ));
+
+    EXPECT_EQ(manager->enableDevice(testhwid), 1);
+}
+
+
 TEST_F(DeviceManagerUnitTest, DisableDeviceReturnsZero) {
-
-    HDEVINFO dummyDevInfo = (HDEVINFO)0x1234;
-
-    // The multi-string to return
-    std::vector<std::string> hwids = { "HWID1", testhwid };
-    std::vector<char> multistring = makeMultiString(hwids);
-    DWORD requiredSize = static_cast<DWORD>(multistring.size());
 
     EXPECT_CALL(mockApi, SetupDiGetClassDevs(_, _))
         .WillRepeatedly(Return(dummyDevInfo));
@@ -406,11 +420,7 @@ TEST_F(DeviceManagerUnitTest, DisableDeviceReturnsZero) {
 }
 
 TEST_F(DeviceManagerUnitTest, ListDevicesReturnsZero) {
-    HDEVINFO dummyDevInfo = (HDEVINFO)0x1234;
-    // The multi-string to return
-    std::vector<std::string> hwids = { "HWID1", testhwid };
-    std::vector<char> multistring = makeMultiString(hwids);
-    DWORD requiredSize = static_cast<DWORD>(multistring.size());
+
     EXPECT_CALL(mockApi, SetupDiGetClassDevs(_, _))
         .WillRepeatedly(Return(dummyDevInfo));
     EXPECT_CALL(mockApi, SetupDiEnumDeviceInfo(_, _, _))
@@ -461,12 +471,10 @@ TEST_F(DeviceManagerUnitTest, installDriverReturnsZero) {
 }
 
 TEST_F(DeviceManagerUnitTest, UninstallDriverReturnsTrue) {
-    HDEVINFO dummyDevInfo = (HDEVINFO)0x1234;
+
     SP_DEVINFO_DATA dummyDevInfoData = {};
     dummyDevInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
-    std::vector<std::string> hwids = { "HWID1", testhwid };
-    std::vector<char> multistring = makeMultiString(hwids);
-    DWORD requiredSize = static_cast<DWORD>(multistring.size());
+
     std::string infPath = "oem1.inf";
     DWORD infSize = static_cast<DWORD>(infPath.size() + 1);
 
