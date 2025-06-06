@@ -66,6 +66,7 @@ int PortDeviceManager::listPortCallback(enumContext* context)
         logger << ctx->sep << portName;
         ctx->sep = ", ";
     }
+    ctx->found = true;
     return 0;
 }
 

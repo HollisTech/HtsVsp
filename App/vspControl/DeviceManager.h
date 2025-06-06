@@ -176,8 +176,18 @@ namespace DeviceManager {
          */
         virtual CallbackFunc listCallback() = 0;
 
+        /**
+         * @brief Gets the callback function for enabling devices.
+         *
+         * @return CallbackFunc The callback function.
+         */
         virtual CallbackFunc enableCallback() = 0;
 
+        /**
+         * @brief Gets the callback function for disabling devices.
+         *
+         * @return CallbackFunc The callback function.
+         */
         virtual CallbackFunc disableCallback() = 0;
 
         /**
@@ -297,7 +307,21 @@ namespace DeviceManager {
          */
         virtual int removeDevice(const std::string& device);
 
+        /**
+         * @brief enable a device.
+         *
+         * @param device The name of the device to enable.
+         * @return int 0 on success, non-zero on failure.
+         */
+
         virtual int enableDevice(const std::string& device);
+
+        /**
+         * @brief disable a device.
+         *
+         * @param device The name of the device to disable.
+         * @return int 0 on success, non-zero on failure.
+         */
 
         virtual int disableDevice(const std::string& device);
 
