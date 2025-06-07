@@ -69,54 +69,54 @@ namespace DeviceManager {
          *
          * @param infFile The path to the INF file.
          * @param uninstall Whether to uninstall the existing driver before installing the new one.
-         * @return int 0 on success, non-zero on failure.
+         * @return bool true on success, false on failure.
          */
-        virtual int installDriver(const std::string& infFile, bool uninstall = false) = 0;
+        virtual bool installDriver(const std::string& infFile, bool uninstall = false) = 0;
 
         /**
          * @brief Uninstalls the driver.
          *
-         * @return int 0 on success, non-zero on failure.
+         * @return bool true on success, false on failure.
          */
-        virtual int uninstallDriver(const std::string& infFile);
+        virtual bool uninstallDriver(const std::string& infFile);
 
         /**
          * @brief Lists the devices.
          *
-         * @return int 0 on success, non-zero on failure.
+         * @return bool true on success, false on failure.
          */
-        virtual int listDevices();
+        virtual bool listDevices();
 
         /**
          * @brief Adds a device.
          *
-         * @return int 0 on success, non-zero on failure.
+         * @return bool true on success, false on failure.
          */
-        virtual int addDevice() = 0;
+        virtual bool addDevice() = 0;
 
         /**
          * @brief Removes a device.
          *
          * @param device The name of the device to remove.
-         * @return int 0 on success, non-zero on failure.
+         * @return  bool true on success, false on failure
          */
-        virtual int removeDevice(const std::string& device) = 0;
+        virtual bool removeDevice(const std::string& device) = 0;
 
         /**
          * @brief Enables a device.
          *
          * @param device The name of the device to enable.
-         * @return int 0 on success, non-zero on failure.
+         * @return bool true on success, false on failure.
          */
-        virtual int enableDevice(const std::string& device) = 0;
+        virtual bool enableDevice(const std::string& device) = 0;
 
         /**
          * @brief Disables a device.
          *
          * @param device The name of the device to disable.
-         * @return int 0 on success, non-zero on failure.
+         * @return bool true on success, false on failure.
          */
-        virtual int disableDevice(const std::string& device) = 0;
+        virtual bool disableDevice(const std::string& device) = 0;
 
     protected:
         /**
@@ -290,40 +290,40 @@ namespace DeviceManager {
 
         virtual ~SoftwareDeviceManager() {}
 
-        virtual int installDriver(const std::string& infFile, bool uninstall);
+        virtual bool installDriver(const std::string& infFile, bool uninstall) override;
 
         /**
          * @brief Adds a device.
          *
-         * @return int 0 on success, non-zero on failure.
+         * @return bool true on success, false on failure.
          */
-        virtual int addDevice();
+        virtual bool addDevice();
 
         /**
          * @brief Removes a device.
          *
          * @param device The name of the device to remove.
-         * @return int 0 on success, non-zero on failure.
+         * @return bool true on success, false on failure.
          */
-        virtual int removeDevice(const std::string& device);
+        virtual bool removeDevice(const std::string& device);
 
         /**
          * @brief enable a device.
          *
          * @param device The name of the device to enable.
-         * @return int 0 on success, non-zero on failure.
+         * @return bool true on success, false on failure.
          */
 
-        virtual int enableDevice(const std::string& device);
+        virtual bool enableDevice(const std::string& device);
 
         /**
          * @brief disable a device.
          *
          * @param device The name of the device to disable.
-         * @return int 0 on success, non-zero on failure.
+         * @return bool true on success, false on failure.
          */
 
-        virtual int disableDevice(const std::string& device);
+        virtual bool disableDevice(const std::string& device);
 
     protected:
 

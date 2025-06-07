@@ -140,7 +140,7 @@ namespace DeviceManager {
         return api()->SetupDiGetClassDevs(getClassGuid(), flags);
     }
 
-    BOOL DeviceManager::uninstallDriver(const std::string& infFile)
+    bool DeviceManager::uninstallDriver(const std::string& infFile)
     {
         DWORD flags = DIGCF_PRESENT;
         HDevInfoHandle hDevInfo(getDevInfoSet(flags), api());
@@ -149,7 +149,7 @@ namespace DeviceManager {
         if (!hDevInfo.isValid()) {
             logger << "Failed to get class devices. Error: " << std::hex << api()->getLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
-            return FALSE;
+            return false;
         }
 
         SP_DEVINFO_DATA devInfoData;
@@ -204,12 +204,12 @@ namespace DeviceManager {
             if (!api()->SetupDiSetClassInstallParams(hDevInfo.get(), &devInfoData, &rmdParams.ClassInstallHeader, sizeof(rmdParams))) {
                 logger << "Failed to set class install params. Error: " << std::hex << api()->getLastError() << std::endl;
                 logger.flush(Logger::ERROR_LVL);
-                return FALSE;
+                return false;
             }
             if (!api()->SetupDiCallClassInstaller(DIF_REMOVE, hDevInfo.get(), &devInfoData)) {
                 logger << "Failed to call class installer. Error: " << std::hex << api()->getLastError() << std::endl;
                 logger.flush(Logger::ERROR_LVL);
-                return FALSE;
+                return false;
             }
         }
         oemfiles.sort();
@@ -221,10 +221,10 @@ namespace DeviceManager {
             if (!api()->SetupUninstallOEMInf(infPath.c_str(), SUOI_FORCEDELETE)) {
                 logger << "Failed to uninstall driver. Error: " << std::hex << api()->getLastError() << std::endl;
                 logger.flush(Logger::ERROR_LVL);
-                return FALSE;
+                return false;
             }
         }
-        return TRUE;
+        return true;
     }
 
     void DeviceManager::findHwIds(std::vector<std::string>& result)
@@ -259,7 +259,7 @@ namespace DeviceManager {
         }
     }
 
-   int SoftwareDeviceManager::installDriver(const std::string& infFile, bool uninstall)
+    bool SoftwareDeviceManager::installDriver(const std::string& infFile, bool uninstall)
     {
         std::string infPath = api()->getFullPath(infFile);
         if (uninstall) {
@@ -272,15 +272,15 @@ namespace DeviceManager {
         if (!hDevInfo.isValid()) {
             logger << "SetupDiCreateDeviceInfoList failed error: " << std::hex << api()->getLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
-            return 1;
+            return false;
         }
 
         if (!addNewDevice(hDevInfo.get(), &devInfoData)) {
-            return 1;
+            return false;
         }
 
         if (!api()->updateDriver(infPath, getHwId())) {
-            return 1;
+            return false;
         }
         RegKeyHandle regKey(openDeviceSoftwareKey(hDevInfo.get(), &devInfoData), api());
         if (!regKey.isValid()) {
@@ -298,10 +298,10 @@ namespace DeviceManager {
         else {
             enumKey(regKey.get());
         }
-        return 0;
+        return true;
     }
 
-    int DeviceManager::listDevices()
+    bool DeviceManager::listDevices()
     {
         int retval = 1;
         enumListContext listContext = { 0 };
@@ -310,12 +310,12 @@ namespace DeviceManager {
         if (!hDevInfo.isValid()) {
             logger << "Failed to get class devices. Error: " << api()->getLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
-            return retval;
+            return false;
         }
         listContext.hDevInfo = hDevInfo.get();
         retval = enumClassDevices(listCallback(), &listContext);
         logger.flush(Logger::INFO_LVL);
-        return retval;
+        return retval == 0;
     }
 
     int DeviceManager::enumClassDevices(
@@ -423,29 +423,29 @@ namespace DeviceManager {
         return true;
     }
 
-    int SoftwareDeviceManager::addDevice()
+    bool SoftwareDeviceManager::addDevice()
     {
         SP_DEVINFO_DATA devInfoData;
         HDevInfoHandle hDevInfo(createNewDeviceInfoSet(&devInfoData), api());
         if (!hDevInfo.isValid()) {
             logger << "SetupDiCreateDeviceInfoList failed error: " << std::hex << api()->getLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
-            return 1;
+            return false;
         }
         // Add the HardwareID to the Device's HardwareID property.
         if (!addNewDevice(hDevInfo.get(), &devInfoData)) {
-            return 1;
+            return false;
         }
         //  use DiInstallDevice.
         if (!api()->installDevice(hDevInfo.get(), &devInfoData)) {
             logger << "DiInstallDevice failed error: " << std::hex << api()->getLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
-            return 1;
+            return false;
         }
-        return 0;
+        return true;
     }
 
-    int SoftwareDeviceManager::removeDevice(const std::string& device)
+    bool SoftwareDeviceManager::removeDevice(const std::string& device)
     {
         int retval = 1;
         enumDeviceContext removeContext = { 0 };
@@ -454,7 +454,7 @@ namespace DeviceManager {
         if (!hDevInfo.isValid()) {
             logger << "Failed to get class devices. Error: " << api()->getLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
-            return retval;
+            return false;
         }
         removeContext.hDevInfo = hDevInfo.get();
         retval = enumClassDevices(removeCallback(), &removeContext);
@@ -467,14 +467,14 @@ namespace DeviceManager {
             if (setClassDeviceState((enumContext *)&removeContext, &rmdParams.ClassInstallHeader, sizeof(rmdParams)) != 0) {
                 logger << "Failed to set class device state for DIF_REMOVE." << std::endl;
                 logger.flush(Logger::ERROR_LVL);
-                return 1;
+                return false;
             }
-            return 0;
+            return true;
         }
-        return 1;
+        return false;
     }
 
-    int SoftwareDeviceManager::enableDevice(const std::string& device) 
+    bool SoftwareDeviceManager::enableDevice(const std::string& device) 
     {
         int retval = 1;
         enumDeviceContext enableContext = { 0 };
@@ -483,7 +483,7 @@ namespace DeviceManager {
         if (!hDevInfo.isValid()) {
             logger << "Failed to get class devices. Error: " << api()->getLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
-            return retval;
+            return false;
         }
         enableContext.hDevInfo = hDevInfo.get();
         retval = enumClassDevices(enableCallback(), &enableContext);
@@ -497,14 +497,14 @@ namespace DeviceManager {
             if (setClassDeviceState((enumContext *)&enableContext, &params.ClassInstallHeader, sizeof(params)) != 0) {
                 logger << "Failed to set class device state for DICS_ENABLE." << std::endl;
                 logger.flush(Logger::ERROR_LVL);
-                return 1;
+                return false;
             }
-            return 0;
+            return true;
         }
-        return 1;
+        return false;
     }
 
-    int SoftwareDeviceManager::disableDevice(const std::string& device)
+    bool SoftwareDeviceManager::disableDevice(const std::string& device)
     {
         int retval = 1;
         enumDeviceContext disableContext = { 0 };
@@ -513,7 +513,7 @@ namespace DeviceManager {
         if (!hDevInfo.isValid()) {
             logger << "Failed to get class devices. Error: " << api()->getLastError() << std::endl;
             logger.flush(Logger::ERROR_LVL);
-            return retval;
+            return false;
         }
         disableContext.hDevInfo = hDevInfo.get();
         retval = enumClassDevices(disableCallback(), &disableContext);
@@ -527,10 +527,10 @@ namespace DeviceManager {
             if (setClassDeviceState((enumContext*)&disableContext, &params.ClassInstallHeader, sizeof(params)) != 0) {
                 logger << "Failed to set class device state for DICS_DISABLE." << std::endl;
                 logger.flush(Logger::ERROR_LVL);
-                return 1;
+                return false;
             }
-            return 0;
+            return true;
         }
-        return 1;
+        return false;
     }
 }
