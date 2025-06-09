@@ -303,7 +303,6 @@ namespace DeviceManager {
 
     bool DeviceManager::listDevices()
     {
-        int retval = 1;
         enumListContext listContext = { 0 };
         listContext.sep = ""; 
         HDevInfoHandle hDevInfo(getDevInfoSet(DIGCF_PRESENT), api());
@@ -313,17 +312,16 @@ namespace DeviceManager {
             return false;
         }
         listContext.hDevInfo = hDevInfo.get();
-        retval = enumClassDevices(listCallback(), &listContext);
+        bool retval = enumClassDevices(listCallback(), &listContext);
         logger.flush(Logger::INFO_LVL);
-        return retval == 0;
+        return retval;
     }
 
-    int DeviceManager::enumClassDevices(
+    bool DeviceManager::enumClassDevices(
         CallbackFunc callback, 
         enumContext* context,
         DWORD flags)
     {
-        int retval = 1;
         HKEY regKey = (HKEY)INVALID_HANDLE_VALUE;
         context->devInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
         for (DWORD i = 0; api()->SetupDiEnumDeviceInfo(context->hDevInfo, i, &context->devInfoData); ++i) {
@@ -351,9 +349,9 @@ namespace DeviceManager {
             }
         }
         if (context->found) {
-            retval = 0; // found at least one device
+            return true; // found at least one device
         }
-        return retval;
+        return false;
     }
 
     HDEVINFO DeviceManager::createNewDeviceInfoSet(SP_DEVINFO_DATA * devInfoData)
@@ -447,7 +445,6 @@ namespace DeviceManager {
 
     bool SoftwareDeviceManager::removeDevice(const std::string& device)
     {
-        int retval = 1;
         enumDeviceContext removeContext = { 0 };
         removeContext.targetName = device;
         HDevInfoHandle hDevInfo(getDevInfoSet(DIGCF_PRESENT), api());
@@ -457,8 +454,7 @@ namespace DeviceManager {
             return false;
         }
         removeContext.hDevInfo = hDevInfo.get();
-        retval = enumClassDevices(removeCallback(), &removeContext);
-        if (retval == 0) {
+        if (enumClassDevices(removeCallback(), &removeContext)) {
             SP_REMOVEDEVICE_PARAMS rmdParams{ 0 };
             rmdParams.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
             rmdParams.ClassInstallHeader.InstallFunction = DIF_REMOVE;
@@ -476,7 +472,6 @@ namespace DeviceManager {
 
     bool SoftwareDeviceManager::enableDevice(const std::string& device) 
     {
-        int retval = 1;
         enumDeviceContext enableContext = { 0 };
         enableContext.targetName = device;
         HDevInfoHandle hDevInfo(getDevInfoSet(DIGCF_PRESENT), api());
@@ -486,8 +481,7 @@ namespace DeviceManager {
             return false;
         }
         enableContext.hDevInfo = hDevInfo.get();
-        retval = enumClassDevices(enableCallback(), &enableContext);
-        if (retval == 0) {
+        if (enumClassDevices(enableCallback(), &enableContext)) {
             SP_PROPCHANGE_PARAMS params;
             params.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
             params.ClassInstallHeader.InstallFunction = DIF_PROPERTYCHANGE;
@@ -506,7 +500,6 @@ namespace DeviceManager {
 
     bool SoftwareDeviceManager::disableDevice(const std::string& device)
     {
-        int retval = 1;
         enumDeviceContext disableContext = { 0 };
         disableContext.targetName = device;
         HDevInfoHandle hDevInfo(getDevInfoSet(DIGCF_PRESENT), api());
@@ -516,8 +509,7 @@ namespace DeviceManager {
             return false;
         }
         disableContext.hDevInfo = hDevInfo.get();
-        retval = enumClassDevices(disableCallback(), &disableContext);
-        if (retval == 0) {
+        if (enumClassDevices(disableCallback(), &disableContext)) {
             SP_PROPCHANGE_PARAMS params;
             params.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
             params.ClassInstallHeader.InstallFunction = DIF_PROPERTYCHANGE;

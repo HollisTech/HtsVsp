@@ -196,10 +196,10 @@ namespace DeviceManager {
          * @param callback The callback function.
          * @param context The user-defined context passed to the callback function.
          * @param flags The flags for SetupDiGetClassDevs.
-         * @return int 0 on success nonzero on failure.
+         * @return bool true on success, false on failure.
          * 
          */
-        virtual int enumClassDevices(CallbackFunc callback, enumContext * context, DWORD flags = DIGCF_PRESENT);
+        virtual bool enumClassDevices(CallbackFunc callback, enumContext * context, DWORD flags = DIGCF_PRESENT);
 
         /**
          * @brief Creates a new device information set.
