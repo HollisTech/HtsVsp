@@ -86,11 +86,11 @@ int main(int argc, CHAR* argv[])
         }
         if (optResult.count("install")) {
             std::string infFile = optResult["install"].as<std::string>();
-            return portDevice.installDriver(infFile, true);
+            return portDevice.installDriver(infFile, true) ? 0 : 1;
         }
         if (optResult.count("uninstall")) {
             std::string infFile = optResult["uninstall"].as<std::string>();
-            return portDevice.uninstallDriver(infFile);
+            return portDevice.uninstallDriver(infFile) ? 0 : 1;
         }
         if (optResult.count("addDevice")) {
             return portDevice.addDevice();
@@ -101,7 +101,7 @@ int main(int argc, CHAR* argv[])
         }
         if (optResult.count("removeDevice")) {
             std::string comport = str_toupper(optResult["removeDevice"].as<std::string>());
-            if (portDevice.removeDevice(comport) == 0) {
+            if (portDevice.removeDevice(comport)) {
                 logger << "device " << comport << " removed\n";
                 logger.flush(Logger::INFO_LVL);
                 return 0;
