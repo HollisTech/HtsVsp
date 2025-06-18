@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include "../VspControl/DeviceManager.h"
 #include "../vspControl/Logger.h"
+#include "../DeviceManager/DeviceManager.h"
 #include "MockSystemApi.h" // Your Google Mock for ISystemApi
 
 Logger::Level Logger::currentLevel = Logger::INFO_LVL;

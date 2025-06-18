@@ -1,5 +1,5 @@
 #pragma once
-#include "../VspControl/DeviceManager.h"
+#include "../DeviceManager/DeviceManager.h"
 
 using namespace DeviceManager;
 using ::testing::_;
