@@ -1,8 +1,6 @@
 #include "DeviceManager.h"
 #include <newdev.h>
 
-extern Logger logger;
-
 #define UPDATEDRIVERFORPLUGANDPLAYDEVICES "UpdateDriverForPlugAndPlayDevicesA"
 typedef BOOL(WINAPI* UpdateDriverForPlugAndPlayDevicesProto)(_In_opt_ HWND hwndParent,
     _In_ LPCTSTR HardwareId,
@@ -30,20 +28,14 @@ namespace DeviceManager {
     {
         ModuleHandle hNewDev(LoadLibrary(TEXT("newdev.dll")), this);
         if (!hNewDev.isValid()) {
-            logger << "Failed to load newdev.dll. Error: " << std::hex << getLastError() << std::endl;
-            logger.flush(Logger::ERROR_LVL);
             return FALSE;
         }
         DiUninstallDriverProto diUninstallDriver = (DiUninstallDriverProto)GetProcAddress(hNewDev.get(), DIUNINSTALLDRIVER);
         if (diUninstallDriver == NULL) {
-            logger << "Failed to get proc address for DiUninstallDriver. Error: " << std::hex << getLastError() << std::endl;
-            logger.flush(Logger::ERROR_LVL);
             return FALSE;
         }
         BOOL result = diUninstallDriver(NULL, TEXT(infFile.c_str()), 0, NULL);
         if (!result) {
-            logger << "Failed to remove the driver. Error: " << std::hex << getLastError() << std::endl;
-            logger.flush(Logger::ERROR_LVL);
         }
         return result;
     }
@@ -52,20 +44,14 @@ namespace DeviceManager {
     {
         ModuleHandle hNewDev(LoadLibrary(TEXT("newdev.dll")), this);
         if (!hNewDev.isValid()) {
-            logger << "Failed to load newdev.dll. Error: " << std::hex << getLastError() << std::endl;
-            logger.flush(Logger::ERROR_LVL);
             return FALSE;
         }
         UpdateDriverForPlugAndPlayDevicesProto updateDriverForPlugAndPlayDevices = (UpdateDriverForPlugAndPlayDevicesProto)GetProcAddress(hNewDev.get(), UPDATEDRIVERFORPLUGANDPLAYDEVICES);
         if (updateDriverForPlugAndPlayDevices == NULL) {
-            logger << "Failed to get proc address for UpdateDriverForPlugAndPlayDevices. Error: " << std::hex << GetLastError() << std::endl;
-            logger.flush(Logger::ERROR_LVL);
             return FALSE;
         }
         BOOL result = updateDriverForPlugAndPlayDevices(NULL, LPCTSTR(hwid.c_str()), LPCTSTR(infFile.c_str()), INSTALLFLAG_FORCE, NULL);
         if (!result) {
-            logger << "Failed to install driver. Error: " << std::hex << getLastError() << std::endl;
-            logger.flush(Logger::ERROR_LVL);
         }
         return result;
     }
@@ -74,15 +60,11 @@ namespace DeviceManager {
     {
         ModuleHandle hNewDev(LoadLibrary(TEXT("newdev.dll")), this);
         if (!hNewDev.isValid()) {
-            logger << "Failed to load newdev.dll. Error: " << std::hex << getLastError() << std::endl;
-            logger.flush(Logger::ERROR_LVL);
             return FALSE;
         }
 
         DiInstallDeviceProto diInstallDevice = (DiInstallDeviceProto)GetProcAddress(hNewDev.get(), DIINSTALLDEVICE);
         if (diInstallDevice == NULL) {
-            logger << "Failed to get proc address for DiInstallDevice. Error: " << std::hex << getLastError() << std::endl;
-            logger.flush(Logger::ERROR_LVL);
             return FALSE;
         }
 #pragma warning(suppress: 6387)

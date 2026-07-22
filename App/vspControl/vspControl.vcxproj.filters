@@ -29,19 +29,16 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Logger.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="cxxopts.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="PortDeviceManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="devapi.h">
+    <ClInclude Include="..\DeviceManager\DeviceManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\DeviceManager\DeviceManager.h">
+    <ClInclude Include="..\DeviceManager\devapi.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

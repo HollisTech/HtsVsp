@@ -11,7 +11,6 @@
 #include <filesystem>
 #include <iomanip>
 #include <algorithm>
-#include "Logger.h"
 #include "devapi.h"
 
 namespace DeviceManager {    
@@ -117,6 +116,27 @@ namespace DeviceManager {
          * @return bool true on success, false on failure.
          */
         virtual bool disableDevice(const std::string& device) = 0;
+
+        virtual std::string getLogString() const
+        {
+            return logger.str();
+        }
+
+        virtual void clearLogBuf()
+        {
+            logger.str(std::string());
+            logger.clear();
+        }
+
+        virtual bool isVerbose() const
+        {
+            return verbose_;
+        }
+
+        virtual void setVerbose(bool verbose)
+        {
+            verbose_ = verbose;
+        }
 
     protected:
         /**
@@ -258,6 +278,8 @@ namespace DeviceManager {
 
         ISystemApi* api() { return api_; }
 
+        std::ostringstream logger; ///< Stream for logging messages.
+
     private:
         GUID classGuid;              ///< The GUID of the device class.
         const std::string className; ///< The name of the device class.
@@ -268,6 +290,8 @@ namespace DeviceManager {
         DeviceManager& operator=(const DeviceManager& other) = delete;
 
         ISystemApi* api_; ///< Pointer to the system API interface.
+
+        bool verbose_ = false; ///< Flag for verbose output.
     };
 
     /**

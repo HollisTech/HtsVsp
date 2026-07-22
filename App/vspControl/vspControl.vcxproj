@@ -150,10 +150,9 @@
     <ClCompile Include="vspControl.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\DeviceManager\devapi.h" />
     <ClInclude Include="..\DeviceManager\DeviceManager.h" />
     <ClInclude Include="cxxopts.hpp" />
-    <ClInclude Include="devapi.h" />
-    <ClInclude Include="Logger.h" />
     <ClInclude Include="PortDeviceManager.h" />
   </ItemGroup>
   <ItemGroup>
