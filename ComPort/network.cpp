@@ -506,7 +506,7 @@ DWORD ClientThread(PVOID context)
                     // timer doesn't start until at least one byte is read.
 
                     WdfRequestCompleteWithInformation(deviceContext->CurrentRequest,
-                        STATUS_CANCELLED, requestContext->Information);
+                        STATUS_SUCCESS, requestContext->Information);
                     deviceContext->CurrentRequest = NULL;
                 }
             }
