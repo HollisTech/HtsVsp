@@ -20,6 +20,13 @@ Environment:
 
 #include "internal.h"
 
+// these are defined in ntddser.h, but that doesn't work well with user mode.
+#ifndef SERIAL_DSR_STATE
+#define SERIAL_CTS_STATE 0x10
+#define SERIAL_DSR_STATE 0x20
+#define SERIAL_DCD_STATE 0x80
+#endif
+
 EVT_WDF_IO_QUEUE_STATE EvtReadQueueReady;
 
 void EvtReadQueueReady(
@@ -421,6 +428,13 @@ EvtIoDeviceControl(
         status = RequestCopyFromBuffer(Request,
                             modemControlRegister,
                             sizeof(ULONG));
+        break;
+    }
+
+    case IOCTL_SERIAL_GET_MODEMSTATUS:
+    {
+        ULONG modemStatus = SERIAL_CTS_STATE | SERIAL_DSR_STATE | SERIAL_DCD_STATE;
+        status = RequestCopyFromBuffer(Request, &modemStatus, sizeof(modemStatus));
         break;
     }
 
