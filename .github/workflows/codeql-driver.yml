@@ -1,0 +1,94 @@
+# Runs the CodeQL driver analysis as a build option, the same way the Windows
+# Hardware Compatibility Program expects it, and archives the results.
+#
+# This complements the codeql.yml workflow: that one uploads CodeQL results to
+# GitHub code scanning using github/codeql-action, while this one runs the
+# analysis out of the BuildTools build script so that the resulting SARIF file
+# and driver verification log are build artifacts, produced by the same toolset
+# as the shipped binaries.
+#
+# See BuildTools/docs/codeql.md for the tooling, versions and suites.
+
+name: "CodeQL Driver Analysis"
+
+on:
+  push:
+    branches:
+      - main
+      - feature-*
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+
+  # Allow manual scheduling
+  workflow_dispatch:
+
+env:
+
+  # The build itself is configured by codeql.build.json; these are the settings
+  # this workflow needs outside of it.
+  # 2.25.5 is the CodeQL CLI version paired with the 1.10.0 driver query pack.
+  CODEQL_VERSION: 2.25.5
+  ARCHIVE_PREFIX: codeql-analysis
+
+jobs:
+  analyze:
+    name: Analysis
+    runs-on: windows-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+          fetch-depth: 0 # required for generating version number
+
+      - name: Setup NuGet
+        run: nuget restore .\packages.config -PackagesDirectory .\packages\
+
+      - name: Install CodeQL CLI and query packs
+        run: .\BuildTools\codeql.ps1 -install -version ${{env.CODEQL_VERSION}}
+
+      # The build options - toolset, configuration, suite, dvl - live in
+      # codeql.build.json. Values from a build JSON file override parameters
+      # passed on the command line, so passing -toolset or -codeqlSuite here
+      # would be silently ignored; change codeql.build.json instead.
+      - name: Build with CodeQL analysis
+        run: >
+          .\BuildTools\build.ps1
+          -jsonFile .\codeql.build.json
+
+      - name: Archive CodeQL results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{env.ARCHIVE_PREFIX}}-results
+          path: |
+            logs/codeql/*.sarif
+            logs/codeql/*.DVL.XML
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Archive logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{env.ARCHIVE_PREFIX}}-logs
+          path: logs/**/*.log
+
+      - name: Archive Bin
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{env.ARCHIVE_PREFIX}}-bin
+          path: bin/**/*.*

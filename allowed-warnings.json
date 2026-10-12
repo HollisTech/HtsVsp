@@ -1,0 +1,5 @@
+{
+    "allowedWarnings": [
+        "Microsoft\\.CppClean\\.targets.*build-tracer\\.log.*being used by another process"
+    ]
+}
