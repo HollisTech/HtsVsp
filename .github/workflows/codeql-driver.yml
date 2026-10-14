@@ -31,10 +31,10 @@ on:
 
 env:
 
-  # The build itself is configured by codeql.build.json; these are the settings
-  # this workflow needs outside of it.
-  # 2.25.5 is the CodeQL CLI version paired with the 1.10.0 driver query pack.
-  CODEQL_VERSION: 2.25.5
+  # The build is configured by codeql.build.json, and the CodeQL toolchain - the
+  # CLI version, the query packs, dvl.exe - by BuildTools\codeql.json. This
+  # workflow names neither, so there is one place per concern to change, and the
+  # installed versions are exactly the pinned ones.
   ARCHIVE_PREFIX: codeql-analysis
 
 jobs:
@@ -57,7 +57,7 @@ jobs:
         run: nuget restore .\packages.config -PackagesDirectory .\packages\
 
       - name: Install CodeQL CLI and query packs
-        run: .\BuildTools\codeql.ps1 -install -version ${{env.CODEQL_VERSION}}
+        run: .\BuildTools\codeql.ps1 -install
 
       # The build options - toolset, configuration, suite, dvl - live in
       # codeql.build.json. Values from a build JSON file override parameters
