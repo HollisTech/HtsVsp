@@ -1,0 +1,11 @@
+{
+    "toolset" : "VS2026",
+    "configurations" : [ "Release" ],
+    "platforms" : [ "x64" ],
+    "projectRootPath" : ".",
+    "htsToolsPath" : "./BuildTools",
+    "projectPath" : ".",
+    "codeql" : true,
+    "codeqlSuite" : "mustrun",
+    "dvl" : true
+}

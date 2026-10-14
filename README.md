@@ -7,6 +7,45 @@ The driver code is based on the Microsoft windows driver sample [VirtualSerial2]
 The software was developed using Visual Studio 2022 and WDK 10.0.26100.1  
 Other tested tool chains:
 
+### CodeQL static analysis
+The driver can be analyzed with [CodeQL](https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/static-tools-and-codeql)
+as a build option, using the same toolset that builds the binaries. The
+analysis is built into the BuildTools `build` script, so it is one extra
+switch on the normal build.
+
+```PowerShell
+.\BuildTools\codeql.ps1 -install            # once per machine: gets the CodeQL CLI and driver query pack
+.\BuildTools\build.ps1 -jsonFile .\codeql.build.json
+```
+
+`codeql.build.json` runs the `mustrun` suite, which is what WHCP certification
+requires, and creates a driver verification log. The same thing on the command
+line:
+
+```PowerShell
+.\BuildTools\build.ps1 -toolset VS2022 -codeql -codeqlSuite mustrun -dvl
+```
+
+The build rebuilds the solution under the CodeQL extractor, then analyzes it.
+Results are written under `logs/codeql/`:
+
+* `HtsVsp_Release_x64.sarif` - the analysis results
+* `HtsVsp_Release_x64.DVL.XML` - the driver verification log, with `-dvl`
+
+The CodeQL database goes to `%LOCALAPPDATA%\hts-codeql\` instead, outside the
+source tree, as it is several hundred MB of artifact rather than source. Use
+`-codeqlDbDir` to move it.
+
+`allowed-warnings.json` allows the one warning the CodeQL build adds: from the
+second Rebuild on, msbuild's Clean tries to delete the extractor's own
+`build-tracer.log` while the extractor holds it open. It is written by the
+tracer for the tracer, appears once per project, and `build.ps1` otherwise
+fails the build on it.
+
+The `.github/workflows/codeql-driver.yml` workflow does the same on every push.
+See `BuildTools/docs/codeql.md` for the tooling, versions and query suites.
+
+
 ## Components
 ### UDF Driver
 * HtsVsp.dll - the user mode serial driver.
