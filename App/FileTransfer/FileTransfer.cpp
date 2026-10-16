@@ -26,22 +26,33 @@
 #undef max
 #endif
 #include "cxxopts.hpp"
+#include <format>
 
 using std::cout;
 using std::endl;
 
 SOCKET createListeningSocket(USHORT port, std::ostream& outfile);
 bool logSocketData(SOCKET clientSocket, std::ostream& outfile);
-void transferLoop(SOCKET listenSocket, const std::string& directory, std::ostream& outfile);
+void transferLoop(SOCKET listenSocket, const std::string& directory, std::string& archiveDir, std::ostream& outfile, DWORD packetSize);
 #pragma comment(lib, "Ws2_32.lib") 
+
+DWORD transmitInterval = 1067;
+
+std::string timestamp()
+{
+    auto now = std::chrono::system_clock::now();
+    return  std::format("{0:%F_%T}", std::chrono::current_zone()->to_local(now));
+}
 
 int main(int argc, CHAR* argv[])
 {
     USHORT port = 0;
+    DWORD packetSize = 512;
     bool verbose = false;
     bool haveLogStream = false;
     std::ofstream logFileStream;
     std::string directory;
+    std::string archivedir;
     SOCKET listenSocket = INVALID_SOCKET;
 
     try {
@@ -51,6 +62,9 @@ int main(int argc, CHAR* argv[])
             ("p,port", "service port, must be greater than zero.", cxxopts::value<USHORT>())
             ("l,logfile", "log file name.", cxxopts::value<std::string>())
             ("d,directory", "directory to watch for changes.", cxxopts::value<std::string>())
+            ("s,packetSize", "size of network packets, 1-4096 bytes, default 512", cxxopts::value<DWORD>())
+            ("i,interval", "milleseconds delay after transmit message.", cxxopts::value<DWORD>())
+            ("a,archive", "archive each file in the specified directory. Otherwise files are deleted", cxxopts::value<std::string>())
             ("v,verbose", "verbose output.");
 
         auto optResult = options.parse(argc, argv);
@@ -71,8 +85,27 @@ int main(int argc, CHAR* argv[])
         }
         // use log file if specified, otherwise log to console
         std::ostream& outfile = haveLogStream ? logFileStream : std::cout; // default to console output
+
         if (optResult.count("port")) {
             port = optResult["port"].as<USHORT>();
+        }
+
+        if (optResult.count("packetSize")) {
+            packetSize = optResult["packetSize"].as<DWORD>();
+            if ((packetSize < 1) || (packetSize > 4096))
+            {
+                cout << "packetSize " << packetSize << " invalid, must be 1 - 4096." << endl;
+                return 1;
+            }
+        }
+
+        if (optResult.count("interval")) {
+            transmitInterval = optResult["interval"].as<DWORD>();
+            if ((transmitInterval < 1) || (transmitInterval > 60000))
+            {
+                cout << "interval " << transmitInterval << " invalid, must be 1 - 60000." << endl;
+                return 1;
+            }
         }
 
         if (optResult.count("directory")) {
@@ -81,6 +114,14 @@ int main(int argc, CHAR* argv[])
             // for each file in the directory send the file contents as a byte stream to the connected client and then delete the file
             outfile << "directory: " << directory << endl;
         }
+
+        if (optResult.count("archive")) {
+            archivedir = optResult["archive"].as<std::string>();
+            // the directory needs to be watched for changes and when a change is detected, 
+            // for each file in the directory send the file contents as a byte stream to the connected client and then delete the file
+            outfile << "archive directory: " << archivedir << endl;
+        }
+
         if (optResult.count("verbose")) {
             verbose = true;
         }
@@ -107,6 +148,18 @@ int main(int argc, CHAR* argv[])
             }
         }
 
+        if (!archivedir.empty()) {
+            // create the archive directory if it does not exist
+            std::error_code ec;
+            std::filesystem::path archivepath(archivedir);
+            if (!std::filesystem::create_directories(archivepath, ec)) {
+                if (ec) {
+                    outfile << "failed to create archive directory: " << archivedir << ", error: " << ec.message() << endl;
+                    return 1;
+                }
+            }
+        }
+
         // start the file transfer server
         outfile << "starting file transfer server on port: " << port << endl;
         listenSocket = createListeningSocket(port, outfile);
@@ -114,7 +167,7 @@ int main(int argc, CHAR* argv[])
             return 1;
         }
 
-        transferLoop(listenSocket, directory, outfile);
+        transferLoop(listenSocket, directory, archivedir, outfile, packetSize);
 
     }
     catch (const cxxopts::exceptions::exception& e) {
@@ -163,7 +216,7 @@ SOCKET createListeningSocket(USHORT port, std::ostream& outfile)
     return listenSocket;
 }
 
-void transferLoop(SOCKET listenSocket, const std::string& directory, std::ostream& outfile)
+void transferLoop(SOCKET listenSocket, const std::string& directory, std::string& archiveDir, std::ostream& outfile, DWORD packetSize)
 {
     while (true) {
         SOCKET clientSocket = accept(listenSocket, NULL, NULL);
@@ -183,7 +236,17 @@ void transferLoop(SOCKET listenSocket, const std::string& directory, std::ostrea
                 << " Port: " << clientPort << "\n";
         }
         else {
-            std::cerr << "getpeername failed: " << WSAGetLastError() << "\n";
+            std::cerr << "getpeername failed: " << WSAGetLastError() << endl;
+        }
+        //
+        // set TCP_NODELAY
+        // 
+        DWORD value = 1;
+        if (SOCKET_ERROR ==  setsockopt(clientSocket, IPPROTO_TCP, TCP_NODELAY, (char *)&value, sizeof(value)))
+        {
+            outfile << "setsockopt TCP_NODELAY failed: " << WSAGetLastError() << endl;
+            closesocket(clientSocket);
+            return;
         }
         // Watch the directory for changes
         HANDLE hDir = CreateFile(
@@ -199,7 +262,13 @@ void transferLoop(SOCKET listenSocket, const std::string& directory, std::ostrea
             closesocket(clientSocket);
             return;
         }
-        char buffer[1024];
+        char* buffer = new char[packetSize]();
+        if (!buffer) {
+            outfile << "malloc " << packetSize << " bytes failed." << endl;
+            closesocket(clientSocket);
+            return;
+        }
+        char dirBuffer[4096];
         DWORD bytesReturned;
         OVERLAPPED overLapped;
         ZeroMemory(&overLapped, sizeof(overLapped));
@@ -207,8 +276,8 @@ void transferLoop(SOCKET listenSocket, const std::string& directory, std::ostrea
         overLapped.hEvent = hEvent;
         if (!ReadDirectoryChangesW(
             hDir,
-            buffer,
-            sizeof(buffer),
+            dirBuffer,
+            sizeof(dirBuffer),
             FALSE,
             FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE,
             &bytesReturned,
@@ -216,8 +285,12 @@ void transferLoop(SOCKET listenSocket, const std::string& directory, std::ostrea
             NULL))
         {
             outfile << "Initial ReadDirectoryChangesW error " << GetLastError() << endl;
+            delete[] buffer;
+            closesocket(clientSocket);
             return;
         }
+
+        int sockerr = 0;
         while (true) {
             if (!logSocketData(clientSocket, outfile)) {
                 break;                
@@ -228,18 +301,35 @@ void transferLoop(SOCKET listenSocket, const std::string& directory, std::ostrea
                 // For each file in the directory, send the file contents to the client and then delete the file
                 for (const auto& entry : std::filesystem::directory_iterator(directory)) {
                     if (entry.is_regular_file()) {
-                        std::ifstream file(entry.path(), std::ios::binary);
-                        if (file.is_open()) {
-                            char buffer[1024];
-                            int sockerr = 0;
-                            size_t totalSent = 0;
-                            outfile << entry.path().string() << " transfer started" << endl;
-                            while ((sockerr == 0) && (file.read(buffer, sizeof(buffer)) || file.gcount() > 0))
+
+                        Sleep(transmitInterval);
+
+                        std::string pathStr = entry.path().string();
+                        const char* name = pathStr.c_str();
+                        HANDLE hFile = CreateFileA(
+                            name,           // File name
+                            GENERIC_READ,            // Desired access
+                            FILE_SHARE_READ,         // Share mode
+                            NULL,                    // Security attributes
+                            OPEN_EXISTING,           // Creation disposition
+                            FILE_ATTRIBUTE_NORMAL,   // Flags and attributes
+                            NULL                     // Template file
+                        );
+
+                        if (hFile != INVALID_HANDLE_VALUE) {
+                            DWORD totalSent = 0;
+                            DWORD bytesToSend = 0;
+                            outfile << timestamp() << " " << entry.path().string() << " transfer started with packet size: " << packetSize << endl;
+                            while ((sockerr == 0) && 
+                                (ReadFile(hFile, buffer, packetSize, &bytesToSend, NULL)))
                             {
-                                size_t bytesToSend = file.gcount();
-                                size_t sentBytes = 0;
+                                if (bytesToSend == 0) {
+                                    // end of file
+                                    break;
+                                }
+                                DWORD sentBytes = 0;
                                 int zeroCount = 0;
-                                while (totalSent < bytesToSend)
+                                while (sentBytes < bytesToSend)
                                 {
                                     int bytes = send(clientSocket, buffer + sentBytes, (int) (bytesToSend - sentBytes), 0); // ignore zero return?
                                     if (bytes == SOCKET_ERROR) {
@@ -263,25 +353,41 @@ void transferLoop(SOCKET listenSocket, const std::string& directory, std::ostrea
                                         zeroCount = 0;
                                     }
                                 }
-                                outfile << "transmitted:  " << sentBytes << "bytes" << endl;
+                                outfile << "sent: " << sentBytes << " bytes" << endl;
                             }
-                            file.close();
-                            std::filesystem::remove(entry.path());
-                            outfile << "transferred " << totalSent << " and deleted: " << entry.path().string() << endl;
+                            CloseHandle(hFile);
+                            if (sockerr == 0)
+                            {
+                                outfile << timestamp() << " total sent: " << totalSent << " file " << entry.path().string();
+                                if (archiveDir.empty()) {
+                                    std::filesystem::remove(entry.path());
+                                    outfile << " deleted." << endl;
+                                }
+                                else {
+                                    std::filesystem::path archPath(archiveDir);
+                                    archPath /= entry.path().filename();
+                                    std::filesystem::rename(entry.path(), archPath);
+                                    outfile << " moved to " << archPath.string() << endl;
+                                }
+                            }
                         }
                         else {
                             outfile << "failed to open file: " << entry.path().string() << endl;
                         }
                     }
                     if (!logSocketData(clientSocket, outfile)) {
+                        sockerr = WSAGetLastError();
+                        if (sockerr == 0) {
+                            sockerr = WSAENOTCONN; // will be accurate shortly
+                        }
                         break;
                     }
                 }
                 ResetEvent(overLapped.hEvent);
                 if (!ReadDirectoryChangesW(
                     hDir,
-                    buffer,
-                    sizeof(buffer),
+                    dirBuffer,
+                    sizeof(dirBuffer),
                     FALSE,
                     FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE,
                     &bytesReturned,
@@ -292,21 +398,27 @@ void transferLoop(SOCKET listenSocket, const std::string& directory, std::ostrea
                     break;
                 }
             }
-            if (!logSocketData(clientSocket, outfile)) {
+            if (sockerr || (!logSocketData(clientSocket, outfile))) {
                 break;
             }
         }
         CloseHandle(hDir);
         closesocket(clientSocket);
+        delete[] buffer;
+        outfile << "client connection closed." << endl;
     }
 }
 
 int is_data_available_ioctl(SOCKET sock) {
-    u_long bytes_available = 0;
-    if (ioctlsocket(sock, FIONREAD, &bytes_available) != 0) {
-        return -1; // Error
+    WSAPOLLFD client = { sock, POLLIN, 0 };
+    int ret = WSAPoll(&client, 1, 100);
+    if (ret == SOCKET_ERROR ) {
+        return SOCKET_ERROR; // Error
     }
-    return (bytes_available > 0) ? 1 : 0;
+    if (client.revents & POLLERR) {
+        return SOCKET_ERROR;
+    }
+    return (client.revents & POLLIN) ? 1 : 0;
 }
 
 
@@ -318,21 +430,21 @@ bool logSocketData(SOCKET clientSocket, std::ostream& outfile)
     int bytesAvailable = is_data_available_ioctl(clientSocket);
     while (bytesAvailable > 0) {
         result = recv(clientSocket, buffer, sizeof(buffer), 0);
+        if (result == SOCKET_ERROR) {
+            cout << timestamp() << " recv failed with error: " << WSAGetLastError() << endl;
+            return false;
+        }
         if (result > 0) {
-            outfile << "received data: " << std::string(buffer, result) << endl;
+            outfile << timestamp() << " received data:" << endl << std::string(buffer, result) << endl;
         }
         else if (result == 0) {
-            outfile << "client disconnected" << endl;
-            break;
-        }
-        else {
-            cout << "recv failed with error: " << WSAGetLastError() << endl;
-            break;
+            outfile << timestamp() << " client disconnected" << endl;
+            return false;
         }
         bytesAvailable = is_data_available_ioctl(clientSocket);
     }
     if (bytesAvailable < 0) {
-        cout << "ioctlsocket failed with error: " << WSAGetLastError() << endl;
+        cout << timestamp() << " socket failed with error: " << WSAGetLastError() << endl;
         return false;
     }
     return true;
