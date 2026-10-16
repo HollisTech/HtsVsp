@@ -67,9 +67,9 @@ void CleanupNetwork(PDEVICE_CONTEXT deviceContext)
         if (deviceContext->ThreadEvent != NULL) {
             SetEvent(deviceContext->ThreadEvent);
             result = WaitForSingleObject(deviceContext->ThreadHandle, 5000);
-        }
-        if (result != WAIT_OBJECT_0) { // wtf?
-            TerminateThread(deviceContext->ThreadEvent, 1);
+            if (result != WAIT_OBJECT_0) { // wtf?
+                TerminateThread(deviceContext->ThreadEvent, 1);
+            }
         }
         CloseHandle(deviceContext->ThreadHandle);
         deviceContext->ThreadHandle = NULL;
@@ -506,7 +506,7 @@ DWORD ClientThread(PVOID context)
                     // timer doesn't start until at least one byte is read.
 
                     WdfRequestCompleteWithInformation(deviceContext->CurrentRequest,
-                        STATUS_CANCELLED, requestContext->Information);
+                        STATUS_SUCCESS, requestContext->Information);
                     deviceContext->CurrentRequest = NULL;
                 }
             }
@@ -653,11 +653,22 @@ ConfigureClient(PHTS_VSP_CONFIG vspConfig, PQUEUE_CONTEXT queueContext)
             result);
         goto cleanup;
     }
+
     result = getaddrinfo(vspConfig->address, port.c_str(), &hints, &srvAddr);
     if (result != NO_ERROR) {
         Trace(TRACE_LEVEL_ERROR, "getaddrinfo error %#x",
             result);
         goto cleanup;
+    }
+
+    if (deviceContext->ClientSocketEvent == WSA_INVALID_EVENT) {
+        deviceContext->ClientSocketEvent = WSACreateEvent();
+        if (deviceContext->ClientSocketEvent == WSA_INVALID_EVENT) {
+            result = WSAGetLastError();
+            Trace(TRACE_LEVEL_ERROR, "WSACreateEvent error: %#x",
+                result);
+            goto cleanup;
+        }
     }
 
     result = ERROR_NO_MORE_ITEMS;

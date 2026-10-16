@@ -18,30 +18,27 @@
     <ClCompile Include="vspControl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="devicemanager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="PortDeviceManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="devapi.cpp">
+    <ClCompile Include="..\DeviceManager\DeviceManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\DeviceManager\devapi.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="DeviceManager.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Logger.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="cxxopts.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="PortDeviceManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="devapi.h">
+    <ClInclude Include="..\DeviceManager\DeviceManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\DeviceManager\devapi.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

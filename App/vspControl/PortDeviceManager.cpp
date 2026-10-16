@@ -1,7 +1,5 @@
 #include "PortDeviceManager.h"
-#include "Logger.h"
 using namespace DeviceManager;
-extern Logger logger;
 
 std::string PortDeviceManager::getPortName(enumContext* context)
 {
@@ -9,8 +7,6 @@ std::string PortDeviceManager::getPortName(enumContext* context)
     RegKeyHandle regKey(openDeviceHardwareKey(context->hDevInfo, &context->devInfoData), api());
     if (!regKey.isValid()) {
         // this should not happen
-        logger << "SetupDiOpenDevRegKey DIREG_DRV failed error: " << std::hex << api()->getLastError() << std::endl;
-        logger.flush(Logger::ERROR_LVL);
     }
     else {
         DWORD portNameSize = 0;
@@ -40,12 +36,10 @@ int PortDeviceManager::devicePortCallback(enumContext* context)
 int PortDeviceManager::listPortCallback(enumContext* context)
 {
     enumListContext* ctx = (enumListContext*)context;
-    if (logger.getLogLevel() == Logger::VERBOSE_LVL) {
+    if (isVerbose()) {
         RegKeyHandle regKey(openDeviceHardwareKey(ctx->hDevInfo, &ctx->devInfoData), api());
         if (!regKey.isValid()) {
             // this should not happen
-            logger << "SetupDiOpenDevRegKey DIREG_DRV failed error: " << std::hex << api()->getLastError() << std::endl;
-            logger.flush(Logger::ERROR_LVL);
         }
         else {
             enumKey(regKey.get());
@@ -53,13 +47,10 @@ int PortDeviceManager::listPortCallback(enumContext* context)
         regKey = openDeviceSoftwareKey(ctx->hDevInfo, &ctx->devInfoData);
         if (!regKey.isValid()) {
             // this should not happen
-            logger << "SetupDiOpenDevRegKey DIREG_DRV failed error: " << std::hex << api()->getLastError() << std::endl;
-            logger.flush(Logger::ERROR_LVL);
         }
         else {
             enumKey(regKey.get());
         }
-        logger.flush(Logger::INFO_LVL);
     }
     else {
         std::string portName = getPortName(ctx);

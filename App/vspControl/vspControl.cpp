@@ -8,7 +8,6 @@
 #include <string>
 #include <msports.h>
 #include "PortDeviceManager.h"
-#include "logger.h"
 
 #ifdef min
 #undef min
@@ -33,11 +32,6 @@ void reportStatistics();
 int echoService(HTS_VSP_CONFIG& config);
 void setWaitUnits(ULONG units);
 
-
-// Initialize the static members
-Logger::Level Logger::currentLevel = Logger::INFO_LVL;
-std::mutex Logger::logMutex;
-Logger logger;
 ULONG htsvspPortNumber = 0;
 
 int main(int argc, CHAR* argv[])
@@ -72,10 +66,11 @@ int main(int argc, CHAR* argv[])
 
         SystemApi api;
         PortDeviceManager portDevice("UMDF\\HtsVsp", &api);
+        bool bResult = false;
 
         auto optResult = options.parse(argc, argv);
         if (optResult.count("verbose")) {
-            logger.setLogLevel(Logger::VERBOSE_LVL);
+            portDevice.setVerbose(true);
         }
         if (optResult.count("help")) {
             std::cout << options.help() << std::endl;
@@ -86,45 +81,50 @@ int main(int argc, CHAR* argv[])
         }
         if (optResult.count("install")) {
             std::string infFile = optResult["install"].as<std::string>();
-            return portDevice.installDriver(infFile, true) ? 0 : 1;
+            bResult = portDevice.installDriver(infFile, true);
+            std::cout << portDevice.getLogString();
+            portDevice.clearLogBuf();
+            return bResult ? 0 : 1;
         }
         if (optResult.count("uninstall")) {
             std::string infFile = optResult["uninstall"].as<std::string>();
-            return portDevice.uninstallDriver(infFile) ? 0 : 1;
+            bResult = portDevice.uninstallDriver(infFile);
+            std::cout << portDevice.getLogString();
+            portDevice.clearLogBuf();
+            return bResult ? 0 : 1;
         }
         if (optResult.count("addDevice")) {
-            return portDevice.addDevice();
+            bResult = portDevice.addDevice();
+            std::cout << portDevice.getLogString();
+            portDevice.clearLogBuf();
+            return bResult ? 0 : 1;
         }
         if (optResult.count("listDevices")) {
             portDevice.listDevices();
+            std::cout << portDevice.getLogString();
+            portDevice.clearLogBuf();
             return 0;
         }
         if (optResult.count("removeDevice")) {
             std::string comport = str_toupper(optResult["removeDevice"].as<std::string>());
-            if (portDevice.removeDevice(comport)) {
-                logger << "device " << comport << " removed\n";
-                logger.flush(Logger::INFO_LVL);
-                return 0;
-            }
-            return 1;
+            bResult = portDevice.removeDevice(comport);
+            std::cout << portDevice.getLogString();
+            portDevice.clearLogBuf();
+            return bResult ? 0 : 1;
         }
         if (optResult.count("enableDevice")) {
             std::string comport = str_toupper(optResult["enableDevice"].as<std::string>());
-            if (portDevice.enableDevice(comport) == 0) {
-                logger << "device " << comport << " enabled\n";
-                logger.flush(Logger::INFO_LVL);
-                return 0;
-            }
-            return 1;
+            bResult = portDevice.enableDevice(comport);
+            std::cout << portDevice.getLogString();
+            portDevice.clearLogBuf();
+            return bResult ? 0 : 1;
         }
         if (optResult.count("disableDevice")) {
             std::string comport = str_toupper(optResult["disableDevice"].as<std::string>());
-            if (portDevice.disableDevice(comport) == 0) {
-                logger << "device " << comport << " disabled\n";
-                logger.flush(Logger::INFO_LVL);
-                return 0;
-            }
-            return 1;
+            bResult = portDevice.disableDevice(comport);
+            std::cout << portDevice.getLogString();
+            portDevice.clearLogBuf();
+            return bResult ? 0 : 1;
         }
         if (optResult.count("ipaddress")) {
             strcpy_s(config.address, (optResult["ipaddress"].as<std::string>()).c_str());
@@ -150,12 +150,10 @@ int main(int argc, CHAR* argv[])
 
         ULONG result = findHtsVsp(htsvspPortNumber);
         if (result == ERROR_SUCCESS) {
-            logger << "found htsvsp at \\\\.\\COM" << htsvspPortNumber << "\n";
-            logger.flush(Logger::INFO_LVL);
+            cout << "found htsvsp at \\\\.\\COM" << htsvspPortNumber << "\n";
         }
         else {
-            logger << "no htsvsp ports found\n";
-            logger.flush(Logger::ERROR_LVL);
+            cout << "no htsvsp ports found\n";
             return result;
         }
 
@@ -180,21 +178,19 @@ int main(int argc, CHAR* argv[])
         if (config.closeConnections) {
             HANDLE handle = configVSp(htsvspPortNumber, config);
             if (handle == INVALID_HANDLE_VALUE) {
-                logger << "failed to close connections\n";
-                logger.flush(Logger::ERROR_LVL);
+                cout << "failed to close connections\n";
                 return 1;
             }
-            logger << "connections closed\n";
-            logger.flush(Logger::INFO_LVL);
+            cout << "connections closed\n";
             CloseHandle(handle);
             return 0;
         }
         if (config.port == 0) {
-            logger.log(Logger::ERROR_LVL, "port number must be greater than zero\n");
+            cout << "port number must be greater than zero\n";
             return 0;
         }
         if (config.clientMode && config.address[0] == 0) {
-            logger.log(Logger::ERROR_LVL, "client mode requires an ip address or dns name\n");
+            cout << "client mode requires an ip address or dns name\n";
             return 0;
         }
         if (echoServiceMode) {
@@ -207,20 +203,17 @@ int main(int argc, CHAR* argv[])
             result = ERROR_FILE_NOT_FOUND;
         }
         else {
-            logger << "htsvsp at \\\\.\\COM" << htsvspPortNumber << " configured\n";
+            cout << "htsvsp at \\\\.\\COM" << htsvspPortNumber << " configured\n";
             CloseHandle(handle);
         }
-        logger.flush(Logger::INFO_LVL);
         return (int)result;
     }
     catch (const cxxopts::exceptions::exception& e) {
-        logger << "error parsing options: " << e.what() << endl;
-        logger.flush(Logger::ERROR_LVL);
+        cout << "error parsing options: " << e.what() << endl;
         return 1;
     }
     catch (const std::exception& e) {
-        logger << "error: " << e.what() << endl;
-        logger.flush(Logger::ERROR_LVL);
+        cout << "error: " << e.what() << endl;
         return 1;
     }
 }
@@ -230,12 +223,10 @@ void reportStatistics()
     ULONG portNumber;
     ULONG result = findHtsVsp(portNumber);
     if (result == ERROR_SUCCESS) {
-        logger << "found htsvsp at \\\\.\\COM" << portNumber << "\n";
-        logger.flush(Logger::INFO_LVL);
+        cout << "found htsvsp at \\\\.\\COM" << portNumber << "\n";
     }
     else {
-        logger << "no htsvsp ports found\n";
-        logger.flush(Logger::INFO_LVL);
+        cout << "no htsvsp ports found\n";
         return;
     }
 
@@ -247,12 +238,11 @@ void reportStatistics()
         bool bResult = DeviceIoControl(h, IOCTL_HTSVSP_REPORT,
             NULL, 0, &report, sizeof(report), &bytesReturned, NULL);
         if (!bResult) {
-            logger << "DeviceIoControl IOCTL_HTSVSP_REPORT failed error " << GetLastError() << "\n";
-            logger.flush(Logger::ERROR_LVL);
+            cout << "DeviceIoControl IOCTL_HTSVSP_REPORT failed error " << GetLastError() << "\n";
             CloseHandle(h);
             return;
         }
-        logger <<
+        cout <<
             "bytes written:     " << report.bytesWritten << endl <<
             "bytes read:        " << report.bytesRead << endl <<
             "interval events:   " << report.intervalTimerEvents << endl <<
@@ -265,7 +255,6 @@ void reportStatistics()
             "wait timeouts:     " << report.waitTimeouts << endl <<
             "wait units:        " << report.waitUnits << endl <<
             "trace level:       " << report.traceLevel << endl;
-        logger.flush(Logger::INFO_LVL);
         CloseHandle(h);
     }
 

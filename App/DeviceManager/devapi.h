@@ -58,6 +58,7 @@ namespace DeviceManager {
     // Default implementation using real Windows API
     class SystemApi : public ISystemApi {
     public:
+
         HDEVINFO SetupDiGetClassDevs(const GUID* ClassGuid, DWORD flags) override {
             return ::SetupDiGetClassDevs(ClassGuid, nullptr, nullptr, flags);
         }

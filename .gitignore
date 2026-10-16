@@ -1,6 +1,8 @@
 /bin
 /logs
 /packages
+/tempFiles
+/testArchive
 inc/ntverp.h
 inc/buildnumber.props
 x64/
